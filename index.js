@@ -125,7 +125,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.1.2',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.1.3',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

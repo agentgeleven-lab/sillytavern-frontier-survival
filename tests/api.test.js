@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {apiSettings,DEFAULT_API,modelsEndpoint,requestModels} from '../src/api.js';
+import {apiSettings,DEFAULT_API,modelsEndpoint,requestModels,requestJSON,validateConfig} from '../src/api.js';
 const config={...DEFAULT_API,baseUrl:'https://example.com/v1',model:'model-a',apiKey:'test-session-secret'};
 function memory(){const data=new Map();return {data,getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};}
 
@@ -42,4 +42,29 @@ test('model fetch explains unsupported, invalid and empty responses',async()=>{
 });
 test('cancelled late model responses cannot be applied',async()=>{
   const controller=new AbortController();await assert.rejects(requestModels(config,{signal:controller.signal,fetchImpl:async()=>{controller.abort();return {ok:true,text:async()=>' {"data":[{"id":"late"}]}'};}}),/取消/);
+});
+
+test('timeout accepts zero and values beyond 300 seconds, rejects invalid values',()=>{
+  for(const timeout of [0,1,600,3000000])assert.doesNotThrow(()=>validateConfig({...config,timeout}));
+  for(const timeout of [-1,Infinity,NaN])assert.throws(()=>validateConfig({...config,timeout}),/超时/);
+});
+test('unlimited mode schedules no timer for generation or model discovery',async t=>{
+  const timer=t.mock.method(globalThis,'setTimeout',()=>{throw Error('unexpected timer');});
+  await requestJSON({...config,timeout:0},'test',{}, {fetchImpl:async()=>({ok:true,text:async()=>JSON.stringify({choices:[{message:{content:'{"ok":true}'}}]})})});
+  await requestModels({...config,timeout:0},{fetchImpl:async()=>({ok:true,text:async()=>'{"data":[{"id":"test"}]}'})});
+  assert.equal(timer.mock.callCount(),0);
+});
+test('long timeout is not clamped and oversized delays are split into safe chunks',async t=>{
+  const delays=[];t.mock.method(globalThis,'setTimeout',(fn,delay)=>{delays.push(delay);return 1;});t.mock.method(globalThis,'clearTimeout',()=>{});
+  const fetchImpl=async()=>({ok:true,text:async()=>'{"data":[{"id":"test"}]}'});
+  await requestModels({...config,timeout:600},{fetchImpl});assert.equal(delays.pop(),600000);
+  await requestModels({...config,timeout:3000000},{fetchImpl});assert.equal(delays.pop(),2147483000);
+});
+test('unlimited generation and model discovery still support manual cancellation',async()=>{
+  for(const generation of [true,false]){
+    const controller=new AbortController();
+    const fetchImpl=async(url,{signal})=>new Promise((resolve,reject)=>{signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true});controller.abort();});
+    const options={signal:controller.signal,fetchImpl};
+    await assert.rejects(generation?requestJSON({...config,timeout:0},'test',{},options):requestModels({...config,timeout:0},options),/取消/);
+  }
 });
