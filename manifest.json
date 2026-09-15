@@ -1,0 +1,12 @@
+{
+  "display_name": "边境 · 探索生存",
+  "loading_order": 50,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "agentgeleven-lab",
+  "homePage": "https://github.com/agentgeleven-lab/sillytavern-frontier-survival",
+  "version": "0.1.0",
+  "auto_update": false
+}
