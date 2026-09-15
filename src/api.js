@@ -3,9 +3,34 @@ export const DEFAULT_API = { baseUrl: '', model: '', timeout: 120, maxTokens: 60
 export function endpoint(baseUrl) {
   let u; try { u=new URL(baseUrl.trim()); } catch { throw Error('请填写完整 API 地址，例如 https://example.com/v1'); }
   assert(['https:','http:'].includes(u.protocol)&&!u.username&&!u.password&&!u.search&&!u.hash,'API 地址不能包含账号、密钥、查询参数或片段');
-  u.pathname=u.pathname.replace(/\/+$/,'');if(!u.pathname.endsWith('/chat/completions'))u.pathname=(u.pathname||'/v1')+'/chat/completions';return u.href;
+  const path=u.pathname.replace(/\/+$/,'');u.pathname=path.endsWith('/chat/completions')?path:(path||'/v1')+'/chat/completions';return u.href;
 }
 export function validateConfig(c){endpoint(c.baseUrl);assert(typeof c.model==='string'&&c.model.trim(),'请填写模型名称');assert(Number.isInteger(c.maxTokens)&&c.maxTokens>=512&&c.maxTokens<=32000,'输出长度需要为 512–32000');assert(Number.isFinite(c.timeout)&&c.timeout>=10&&c.timeout<=300,'超时需要为 10–300 秒');assert(Number.isFinite(c.temperature)&&c.temperature>=0&&c.temperature<=2,'温度需要为 0–2');return c;}
+export function modelsEndpoint(baseUrl) {
+  const url=new URL(endpoint(baseUrl));
+  url.pathname=url.pathname.replace(/\/chat\/completions$/, '/models');
+  return url.href;
+}
+export async function requestModels(config,{signal,fetchImpl=globalThis.fetch}={}) {
+  const url=modelsEndpoint(config.baseUrl),controller=new AbortController(),abort=()=>controller.abort();
+  if(signal?.aborted)abort();signal?.addEventListener('abort',abort,{once:true});
+  const timeout=Number(config.timeout)||120;
+  const timer=setTimeout(abort,Math.min(300,Math.max(10,timeout))*1000);
+  try {
+    const response=await fetchImpl(url,{method:'GET',headers:config.apiKey?{Authorization:`Bearer ${config.apiKey}`}:{},credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal});
+    assert(response.ok,`模型列表返回 HTTP ${response.status}。请检查地址与密钥；接口可能不支持 /models，可手动填写模型 ID。`);
+    const raw=await response.text();assert(raw.length<2000000,'模型列表响应过大');
+    const data=JSON.parse(raw);assert(Array.isArray(data.data),'接口未返回兼容的模型列表（data 数组），请手动填写模型 ID。');
+    const models=[...new Set(data.data.map(item=>item?.id).filter(id=>typeof id==='string'&&id.trim()&&id.length<=512))].sort((a,b)=>a.localeCompare(b));
+    assert(models.length,'接口没有返回可选模型，请手动填写模型 ID。');
+    if(controller.signal.aborted)throw Error('aborted');return models;
+  }catch(error){
+    if(controller.signal.aborted)throw Error(signal?.aborted?'已取消拉取模型。':'拉取模型超时，请重试或手动填写模型 ID。');
+    if(error instanceof TypeError)throw Error('模型列表连接失败，请检查网络及接口的跨域（CORS）支持；也可手动填写模型 ID。');
+    if(error instanceof SyntaxError)throw Error('模型列表不是有效 JSON，请检查接口地址或手动填写模型 ID。');
+    throw error;
+  }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+}
 export function parseJSON(raw){text(raw,160000);const clean=raw.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');let value;try{value=JSON.parse(clean);}catch{throw Error('模型未返回完整 JSON，未应用结果；请重试或调整提示词。');}assert(value&&typeof value==='object'&&!Array.isArray(value),'模型结果必须是 JSON 对象');return value;}
 export async function requestJSON(config, system, payload, {signal, fetchImpl=globalThis.fetch}={}) {
   validateConfig(config); const controller=new AbortController(),abort=()=>controller.abort();
@@ -33,7 +58,32 @@ export const PROMPTS = {
   sync: base+'从target这条消息提取最多4条明确的新线索或地点发现。surrounding只用于指代消解，不得提取其中旧事件。返回 {"events":[{"kind":"rumor或discovery","title":"地点名","detail":"信息内容","quote":"target中逐字存在的证据原文","x":null,"y":null}]}。愿望、假设、问题、行动计划、否认和引用示例不算事件。NPC或助手描述的藏宝消息均为rumor，只有target.isUser=true且用户明确陈述已发现地点才可为discovery。xy只能使用明确说出的区域坐标、已知同名地点坐标或明确的这里=当前位置；方向和距离不明确则均为null。禁止物品转移、伤害、建设、死亡事件。没有有效信息则events为空。',
 };
 export function apiSettings(storage, namespace) {
-  const k=`frontier-api:${namespace}`,secret=`${k}:secret`;let config={...DEFAULT_API};
-  try{config={...config,...JSON.parse(storage.getItem(k)||'{}')};config.apiKey=config.rememberKey?storage.getItem(secret)||'':'';}catch{}
-  return {get:()=>({...config}),save(next){validateConfig(next);const {apiKey,...fields}=next;storage.setItem(k,JSON.stringify(fields));if(next.rememberKey)storage.setItem(secret,apiKey);else storage.removeItem(secret);config={...next};return config;}};
+  const legacy=`frontier-api:${namespace}`,key=`${legacy}:profiles`;
+  const clean=input=>Object.fromEntries(Object.keys(DEFAULT_API).map(k=>[k,input[k]??DEFAULT_API[k]]));
+  let state={activeId:'default',profiles:[{id:'default',name:'默认方案',config:{...DEFAULT_API}}]};
+  const raw=storage.getItem(key);
+  if(raw){
+    const saved=JSON.parse(raw);
+    assert(saved.version===1&&Array.isArray(saved.profiles)&&saved.profiles.length,'API 方案数据无效');
+    assert(new Set(saved.profiles.map(p=>p.id)).size===saved.profiles.length&&saved.profiles.some(p=>p.id===saved.activeId),'API 方案索引无效');
+    state={activeId:saved.activeId,profiles:saved.profiles.map(p=>({id:p.id,name:p.name,config:{...clean(p.config),apiKey:p.config.rememberKey?p.config.apiKey||'':''}}))};
+  }else{
+    const old=storage.getItem(legacy);
+    if(old){const config=clean(JSON.parse(old));config.apiKey=config.rememberKey?storage.getItem(`${legacy}:secret`)||'':'';state.profiles[0].config=config;persist(state);}
+  }
+  function persist(next){
+    storage.setItem(key,JSON.stringify({version:1,...next,profiles:next.profiles.map(p=>({...p,config:{...p.config,apiKey:p.config.rememberKey?p.config.apiKey:''}}))}));
+    state=next;
+    // Once migrated, obsolete single-profile secrets must not remain on disk.
+    storage.removeItem(`${legacy}:secret`);storage.removeItem(legacy);
+  }
+  const current=()=>state.profiles.find(p=>p.id===state.activeId);
+  function nameOf(name,except){name=String(name??'').trim();assert(name&&name.length<=60,'方案名称需要为 1–60 个字符');assert(!state.profiles.some(p=>p.id!==except&&p.name===name),'已有同名方案，请使用不同名称');return name;}
+  return {
+    get:()=>({...current().config}),activeId:()=>state.activeId,list:()=>state.profiles.map(({id,name})=>({id,name})),
+    save(next,name=current().name){validateConfig(next);name=nameOf(name,state.activeId);persist({...state,profiles:state.profiles.map(p=>p.id===state.activeId?{...p,name,config:clean(next)}:p)});},
+    create(name,next={...DEFAULT_API}){name=nameOf(name);const id=crypto.randomUUID();persist({activeId:id,profiles:[...state.profiles,{id,name,config:clean(next)}]});return id;},
+    select(id){assert(state.profiles.some(p=>p.id===id),'方案不存在');persist({...state,activeId:id});},
+    remove(id){assert(state.profiles.length>1,'至少需要保留一套 API 方案');assert(state.profiles.some(p=>p.id===id),'方案不存在');const profiles=state.profiles.filter(p=>p.id!==id);persist({activeId:state.activeId===id?profiles[0].id:state.activeId,profiles});},
+  };
 }
