@@ -1,3 +1,4 @@
+import {createDiagnostics,diagnosedRequest} from './src/diagnostics.js';
 import * as E from './src/engine.js';
 import { RegionGameStore as GameStore } from './src/region-store.js';
 import * as W from './src/world.js';
@@ -19,7 +20,7 @@ export function initialize(){
   const ctx=getContext();let namespace='standalone';
   if(ctx?.extensionSettings){ctx.extensionSettings[EXT]??={namespace:crypto.randomUUID(),inject:true,sync:true};namespace=ctx.extensionSettings[EXT].namespace;ctx.saveSettingsDebounced?.();}
   const preferences=ctx?.extensionSettings?.[EXT]??{inject:true,sync:true};
-  const store=new GameStore(localStorage,namespace),api=apiSettings(localStorage,namespace);let ui,drainTimer=null,queued=new Map(),bindings=[],hostWarning='',switchSerial=0,stopped=false;
+  const store=new GameStore(localStorage,namespace),api=apiSettings(localStorage,namespace),diagnostics=createDiagnostics(localStorage,namespace);let ui,drainTimer=null,queued=new Map(),bindings=[],hostWarning='',switchSerial=0,stopped=false;
   function scope(){const c=getContext();if(!c)return 'standalone';const id=c.getCurrentChatId?.()??c.chatId??c.characters?.[c.characterId]?.chat;if(!id)return 'unbound';return `${c.groupId?'group:'+c.groupId:c.characters?.[c.characterId]?.avatar??'chat'}:${id}`;}
   function pushContext(){const c=getContext();if(!c?.setExtensionPrompt)return;const content=preferences.inject&&store.state?`[边境游戏 · 已知现场]\n以下为插件当前保存的游戏事实，仅用作世界背景与角色交流依据。未提供的隐藏战利品和未知地图不应当作已知信息。对话里的传闻可以提供线索，但不要声称已执行未经插件结算的物品转移或建设。\n${E.knownContext(store.state)}\n[/边境游戏]`:'';c.setExtensionPrompt(PROMPT_KEY,content,1,0,false);}
   async function changeChat(){
@@ -40,13 +41,13 @@ export function initialize(){
     pushContext();
   }
 
-  const request=(kind,payload,signal)=>requestJSON(api.get(),PROMPTS[kind],payload,{signal});
-  async function validatedRequest(kind,payload,validator,signal){
-    const raw=await request(kind,payload,signal);try{validator(raw);return raw;}catch(e){
-      ui?.setStatus('模型结果未通过结构检查，正在请求修正…');
-      const fixed=await request(kind,{...payload,correction:{error:e.message,previous:raw}},signal);validator(fixed);return fixed;
-    }
+  function request(kind,payload,signal,validator){
+    const config=api.get();
+    return diagnosedRequest({diagnostics,kind,payload,config,scope:store.scope,signal,validator,
+      request:(input,onTrace)=>requestJSON(config,PROMPTS[kind],input,{signal,onTrace}),
+      onRepair:()=>ui?.setStatus('模型结果未通过结构检查，正在请求修正…')});
   }
+  const validatedRequest=(kind,payload,validator,signal)=>request(kind,payload,signal,validator);
   async function create(options){
     const input={theme:options.theme==='wild'?'荒野独居，以自然环境为主，人造建筑稀少':'末日废土，城市边缘与荒野相接',background:options.background,seed:options.seed};
     await store.run(async(_,signal)=>{
@@ -129,7 +130,7 @@ export function initialize(){
     context:()=>E.knownContext(store.state),preferences,savePreferences(){getContext()?.saveSettingsDebounced?.();pushContext();},
     async sync(){E.assert(getContext(),'未连接酒馆聊天');E.assert(store.state?.mode==='api','离线演示不调用聊天提取 API');const c=getContext();for(let i=Math.max(0,c.chat.length-4);i<c.chat.length;i++)queueMessage(i);ui.setStatus('已加入同步队列；只检查最近四条消息。');},
   };
-  ui=createUI({store,api,actions,hostAvailable:!!ctx});
+  ui=createUI({store,api,actions,diagnostics,hostAvailable:!!ctx});
   store.subscribe(()=>{try{pushContext();}catch(e){ui.setStatus('游戏已保存，但聊天上下文注入失败：'+e.message,true);}});
   function bind(name,fn){const type=ctx?.event_types?.[name];if(type&&ctx.eventSource?.on){ctx.eventSource.on(type,fn);bindings.push([type,fn]);}}
   bind('CHAT_CHANGED',changeChat);
@@ -144,7 +145,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.3.1',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.3.2',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

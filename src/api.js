@@ -1,3 +1,4 @@
+const traceTo=(fn,event)=>{try{fn?.(event);}catch{}};
 import { assert, text } from './engine.js';
 export const DEFAULT_API = { baseUrl: '', model: '', timeout: 0, maxTokens: 6000, temperature: .7, rememberKey: false, apiKey: '' };
 export function endpoint(baseUrl) {
@@ -19,14 +20,15 @@ export function modelsEndpoint(baseUrl) {
   url.pathname=url.pathname.replace(/\/chat\/completions$/, '/models');
   return url.href;
 }
-export async function requestModels(config,{signal,fetchImpl=globalThis.fetch}={}) {
+export async function requestModels(config,{signal,fetchImpl=globalThis.fetch,onTrace}={}) {
   const url=modelsEndpoint(config.baseUrl),controller=new AbortController(),abort=()=>controller.abort();
   if(signal?.aborted)abort();signal?.addEventListener('abort',abort,{once:true});
   const stopTimer=startRequestTimer(config.timeout??0,abort);
   try {
     const response=await fetchImpl(url,{method:'GET',headers:config.apiKey?{Authorization:`Bearer ${config.apiKey}`}:{},credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal});
+    traceTo(onTrace,{httpStatus:response.status});
     assert(response.ok,`模型列表返回 HTTP ${response.status}。请检查地址与密钥；接口可能不支持 /models，可手动填写模型 ID。`);
-    const raw=await response.text();assert(raw.length<2000000,'模型列表响应过大');
+    const raw=await response.text();traceTo(onTrace,{response:raw});assert(raw.length<2000000,'模型列表响应过大');
     const data=JSON.parse(raw);assert(Array.isArray(data.data),'接口未返回兼容的模型列表（data 数组），请手动填写模型 ID。');
     const models=[...new Set(data.data.map(item=>item?.id).filter(id=>typeof id==='string'&&id.trim()&&id.length<=512))].sort((a,b)=>a.localeCompare(b));
     assert(models.length,'接口没有返回可选模型，请手动填写模型 ID。');
@@ -39,14 +41,17 @@ export async function requestModels(config,{signal,fetchImpl=globalThis.fetch}={
   }finally{stopTimer();signal?.removeEventListener('abort',abort);}
 }
 export function parseJSON(raw){text(raw,160000);const clean=raw.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');let value;try{value=JSON.parse(clean);}catch{throw Error('模型未返回完整 JSON，未应用结果；请重试或调整提示词。');}assert(value&&typeof value==='object'&&!Array.isArray(value),'模型结果必须是 JSON 对象');return value;}
-export async function requestJSON(config, system, payload, {signal, fetchImpl=globalThis.fetch}={}) {
+export async function requestJSON(config, system, payload, {signal, fetchImpl=globalThis.fetch,onTrace}={}) {
   validateConfig(config); const controller=new AbortController(),abort=()=>controller.abort();
   if(signal?.aborted)abort();signal?.addEventListener('abort',abort,{once:true});const stopTimer=startRequestTimer(config.timeout,abort);
   try {
     const response=await fetchImpl(endpoint(config.baseUrl),{method:'POST',headers:{'Content-Type':'application/json',...(config.apiKey?{Authorization:`Bearer ${config.apiKey}`}:{})},credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal,
       body:JSON.stringify({model:config.model,stream:false,temperature:config.temperature,max_tokens:config.maxTokens,messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(payload)}]})});
+    traceTo(onTrace,{httpStatus:response.status});
+    const raw=await response.text();traceTo(onTrace,{response:raw});
     if(!response.ok)throw Error(`独立 API 返回 HTTP ${response.status}。请检查地址、模型与密钥；游戏未结算。`);
-    const raw=await response.text();assert(raw.length<250000,'API 响应过大');const data=JSON.parse(raw),choice=data.choices?.[0];
+    assert(raw.length<250000,'API 响应过大');const data=JSON.parse(raw),choice=data.choices?.[0];
+    traceTo(onTrace,{finishReason:choice?.finish_reason??null,modelText:choice?.message?.content??null});
     assert(choice?.finish_reason!=='length','输出被截断，请提高输出长度后重试');
     const result=choice?.message?.content;assert(typeof result==='string','接口未返回 Chat Completions 文本结果');
     if(controller.signal.aborted)throw Error('aborted');return parseJSON(result);
