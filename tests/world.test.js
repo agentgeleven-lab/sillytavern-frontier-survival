@@ -6,7 +6,7 @@ import {REGION_SIZES,BUILDING_SIZES,demoPlan} from '../src/layout.js';
 import {RegionGameStore} from '../src/region-store.js';
 import {validateEvents,applyEvents} from '../src/sync.js';
 
-const game=(size='normal')=>{const spec=W.regionSpec({seed:'testing',atlas:{regions:{}}},0,0,size),raw=W.demoRegion(spec),s=E.newGame(raw,{mode:'demo',seed:'testing'});s.world=W.validateRegion(raw,spec);W.summarizeRegion(s);return s;};
+const game=(size='normal')=>{const spec=W.regionSpec({seed:'testing',atlas:{regions:{}}},0,0,size),raw=W.demoRegion({...spec,environment:spec.environment={...spec.environment,landUse:'town',allowedTerrains:spec.environment.allowedTerrains+'rau',buildingRange:[3,3]}}),s=E.newGame(raw,{mode:'demo',seed:'testing'});s.world=W.validateRegion(raw,spec);W.summarizeRegion(s);return s;};
 test('all three region sizes generate and preserve site size classes',()=>{
   for(const[size,n]of Object.entries(REGION_SIZES)){const s=game(size);E.validateSave(s);assert.equal(Object.keys(s.world.cells).length,n*n);assert.equal(s.player.x,Math.floor(n/2));assert.deepEqual(Object.values(s.world.cells).filter(c=>c.site).map(c=>c.site.size).sort(),['large','normal','small']);}
 });

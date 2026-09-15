@@ -50,7 +50,7 @@ export function initialize(){
   async function create(options){
     const input={theme:options.theme==='wild'?'荒野独居，以自然环境为主，人造建筑稀少':'末日废土，城市边缘与荒野相接',background:options.background,seed:options.seed};
     await store.run(async(_,signal)=>{
-      const spec=W.regionSpec({seed:options.seed,atlas:{regions:{}}},0,0,options.regionSize??'normal');
+      const spec=W.fixedRegionSpec({seed:options.seed,theme:options.theme,atlas:{regions:{}}},0,0);
       const raw=options.mode==='demo'?W.demoRegion(spec):await validatedRequest('world',{...input,constraints:spec},raw=>W.validateRegion(raw,spec),signal);
       const game=E.newGame(raw,options);game.world=W.validateRegion(raw,spec);E.reveal(game);W.summarizeRegion(game);return game;
     },{create:true});
@@ -66,15 +66,12 @@ export function initialize(){
         let data=s.atlas.regions[E.key(p.x,p.y)]?await transaction.loadRegion(s,p.x,p.y):null;
         if(s.atlas.regions[E.key(p.x,p.y)])E.assert(data,'旧区域存档缺失，停止旅行');
         if(!data){
-          const spec=W.regionSpec(s,p.x,p.y,p.size);
+          const spec=W.fixedRegionSpec(s,p.x,p.y);
           const raw=s.mode==='demo'?W.demoRegion(spec):await validatedRequest('world',{...payload,constraints:spec},raw=>W.validateRegion(raw,spec),signal);
           data={world:W.validateRegion(raw,spec),locals:{},clues:[],sync:{}};
         }
         const old=W.installRegion(s,p.x,p.y,data,plan);transaction.stageRegion(oldCoord,old);
         if(getContext())reconcileSources(s,getContext().chat??[]);
-      }else if(type==='buildingSize'){
-        const c=E.cell(s);E.assert(c.site&&!s.player.local&&!s.locals[c.site.id],'建筑已生成，不能改变原有布局大小');
-        E.assert(Object.hasOwn(BUILDING_SIZES,p.size),'建筑大小无效');c.site.size=p.size;
       }else if(type==='enter'){
         const c=E.cell(s);E.assert(c.site,'当前位置没有建筑');
         const raw=s.locals[c.site.id]?null:s.mode==='demo'?demoPlan(c.site.size??'normal'):await validatedRequest('local',{...payload,site:c.site,size:c.site.size??'normal',maxWidth:BUILDING_SIZES[c.site.size??'normal'],maxHeight:BUILDING_SIZES[c.site.size??'normal']},raw=>E.validateLocal(raw,c.site.size??'normal'),signal);E.enter(s,raw);
@@ -83,7 +80,7 @@ export function initialize(){
         const raw=s.mode==='demo'?E.demoLoot(c.name):await validatedRequest('loot',{...payload,action:'搜索容器',container:{name:c.name,kind:c.kind},site:E.cell(s).site},E.validateLoot,signal);E.searchContainer(s,p.x,p.y,raw);
       }else if(type==='survey'){
         E.assert(!s.player.local&&!E.cell(s).depleted,'本格已调查或不在区域地图');
-        const raw=s.mode==='demo'?E.demoLoot('survey'):await validatedRequest('loot',{...payload,action:'调查与采集',terrain:E.cell(s).terrain},E.validateLoot,signal);E.survey(s,raw);
+        const raw=s.mode==='demo'?W.naturalLoot(E.cell(s)):await validatedRequest('loot',{...payload,action:'调查与采集',terrain:E.cell(s).terrain,point:E.cell(s).poi??null,environment:s.world.environment??null},E.validateLoot,signal);E.survey(s,raw);
       }else if(type==='build'){
         // Validate and debit only a draft; API failure discards the draft including time/material changes.
         const recipe=E.RECIPES[p.recipe];E.assert(recipe,'未知建设配方');E.build(s,p.recipe);
@@ -147,7 +144,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.2.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.3.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

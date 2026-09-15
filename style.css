@@ -58,3 +58,31 @@
 .fs-root .fs-map-tabs + .fs-map-layout{height:calc(100% - 50px)}
 .fs-root .fs-inspector .fs-action-list{margin-top:14px}
 @media(max-width:650px){.fs-root .fs-map-tabs + .fs-map-layout{height:auto}.fs-root .fs-map-tabs small{font-size:9px}}
+
+/* The map shares the parchment and olive palette of the surrounding controls. */
+.fs-root .fs-canvas-wrap{background:#e2deca}
+.fs-root .fs-map-toolbar{background:#ede9d9;color:#53644c;gap:10px}
+.fs-root .fs-map-toolbar>span{font-size:12px;line-height:1.6}
+.fs-root .fs-map-coordinate{background:#eee9d8dc;color:#617159;border:1px solid #b9bea3}
+.fs-root .fs-map-legend{background:#f3efdf;color:#6b765c}
+.fs-root .fs-fog-dot{background:#d1d0bb;border:1px solid #9fa68d}
+.fs-root .fs-known-dot{background:#869a6e}
+.fs-root .fs-environment{display:flex;flex-direction:column;gap:7px;margin-top:22px;padding:14px 16px;border:1px solid #d2d5c1;border-radius:10px;background:#eaeedc}
+.fs-root .fs-environment small{letter-spacing:.15em;font-size:10px;color:#7b896b}
+.fs-root .fs-environment b{font-size:13px;font-weight:500;line-height:1.6;color:#435b43}
+.fs-root .fs-environment span{font-size:11px;color:#7c856e}
+.fs-root .fs-map-toolbar>div{flex-shrink:0}
+@media(min-width:651px){
+  .fs-root .fs-map-layout{min-height:0}
+  .fs-root .fs-canvas-wrap{min-height:140px}
+  .fs-root .fs-map-toolbar,.fs-root .fs-map-legend{flex-shrink:0}
+}
+@media(min-width:651px) and (max-height:800px){
+  .fs-root{inset:3vh 3vw}
+  .fs-root .fs-header{height:60px}
+  .fs-root .fs-shell{height:calc(100% - 60px)}
+  .fs-root .fs-main{padding:14px 22px 0}
+  .fs-root .fs-heading{margin-bottom:10px}
+  .fs-root .fs-statusbar{padding:10px 0;margin-bottom:12px}
+  .fs-root .fs-nav{width:148px}
+}

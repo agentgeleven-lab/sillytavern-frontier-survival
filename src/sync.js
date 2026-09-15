@@ -13,7 +13,7 @@ export function validateEvents(raw,target,size=9){
 }
 function canPlace(e,target,s){
   if(e.x===null||!cell(s,e.x,e.y))return false;
-  const known=Object.values(s.world.cells).find(c=>c.known&&c.site?.name===e.title);
+  const known=Object.values(s.world.cells).find(c=>c.known&&(c.site?.name===e.title||c.poi?.name===e.title));
   if(known)return known.x===e.x&&known.y===e.y;
   const normalized=target.text.replace(/[（(]\s*/g,'(').replace(/\s*[）)]/g,')').replace(/，/g,',').replace(/\s/g,'');
   if(normalized.includes(`(${e.x},${e.y})`))return true;
@@ -28,8 +28,8 @@ export function applyEvents(s,events,{id,fingerprint,target,name}){
     if(!canPlace(e,target,s)) {clue.x=null;clue.y=null;}
     if(clue.kind==='discovery'&&clue.x!==null){
       const c=cell(s,clue.x,clue.y);
-      if(c.terrain==='w'||(c.site&&c.site.name!==clue.title)){clue.conflict='与已有地形或建筑冲突，保留为待核对记录';}
-      else if(!c.site){
+      if(c.terrain==='w'||(c.site&&c.site.name!==clue.title)||(c.poi&&c.poi.name!==clue.title)){clue.conflict='与已有地形或地点冲突，保留为待核对记录';}
+      else if(!c.site&&!c.poi){
         // Record former visibility so source removal can retract an unvisited discovery.
         clue.previous={known:c.known,name:c.name};
         c.site={id:`chat-${clue.id}`,name:clue.title,kind:'待探索地点',size:'normal',description:clue.detail,origin:clue.id};c.name=clue.title;c.known=true;clue.appliedSite=c.site.id;

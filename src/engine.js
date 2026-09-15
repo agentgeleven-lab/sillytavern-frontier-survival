@@ -1,7 +1,8 @@
+import {NATURAL_POINTS,validateEnvironment,validateEcology,knownEnvironment} from './environment.js';
 import { REGION_SIZES, BUILDING_SIZES, rasterizeLayout } from './layout.js';
 // The game state is the authority. Model output is input data, never executable code.
 export const VERSION = 2;
-export const TERRAINS = { '.': ['草地', '#54664b'], f: ['林地', '#344d41'], r: ['道路', '#77746a'], w: ['水域', '#365d68'], h: ['丘陵', '#736854'] };
+export const TERRAINS = { '.': ['草地', '#54664b'], f: ['林地', '#344d41'], r: ['道路', '#77746a'], w: ['水域', '#365d68'], h: ['山地', '#887f69'], s:['沙地','#b9ad83'], n:['寒原','#b7c8bc'], m:['沼泽','#687e65'], a:['农田','#a6a06a'], u:['街区','#9b9685'] };
 export const ITEMS = {
   wood: { name: '木材', weight: 1 }, cloth: { name: '布料', weight: .2 }, scrap: { name: '金属零件', weight: .5 },
   water: { name: '饮用水', weight: .5 }, food: { name: '食品', weight: .3 }, medicine: { name: '医疗用品', weight: .1 },
@@ -29,7 +30,7 @@ export function validateWorld(raw, options = {}) {
   const cells = {};
   raw.terrain.forEach((row, y) => {
     assert(typeof row === 'string' && row.length === n && [...row].every(c => Object.hasOwn(TERRAINS, c)), `区域地形需要 ${n}×${n} 个合法格子`);
-    [...row].forEach((terrain, x) => { cells[key(x, y)] = { x, y, terrain, name: TERRAINS[terrain][0], known: false, visited: false, surveyed: false, depleted: false, site: null, camp: null }; });
+    [...row].forEach((terrain, x) => { cells[key(x, y)] = { x, y, terrain, name: TERRAINS[terrain][0], known: false, visited: false, surveyed: false, depleted: false, site: null, poi: null, camp: null }; });
   });
   assert(cells[key(center,center)].terrain !== 'w', '起点不能位于水中');
   assert(Array.isArray(raw.sites) && raw.sites.length <= n*2, '建筑数量不合法');
@@ -39,8 +40,14 @@ export function validateWorld(raw, options = {}) {
     c.site = { id: `site-${c.x}-${c.y}`, name: text(site.name, 70), kind: text(site.kind, 50), description: text(site.description, 400), size: site.size??'normal', origin: 'world' };
     assert(Object.hasOwn(BUILDING_SIZES,c.site.size),'建筑大小等级无效'); assert(c.site.name, '建筑需要名称'); c.name = c.site.name;
   }
+  assert(raw.points===undefined||(Array.isArray(raw.points)&&raw.points.length<=n*2),'自然地点数量无效');
+  for(const point of raw.points??[]){
+    const c=cells[key(int(point.x,0,n-1),int(point.y,0,n-1))];
+    assert(c.terrain!=='w'&&!c.site&&!c.poi,'自然地点重叠或位于水中');assert(Object.hasOwn(NATURAL_POINTS,point.kind),'自然地点类型无效');
+    c.poi={id:`point-${c.x}-${c.y}`,kind:point.kind,name:text(point.name,70),description:text(point.description,400)};assert(c.poi.name,'自然地点需要名称');c.name=c.poi.name;
+  }
   const connected = flood({ x: center, y: center }, (x, y) => !!cells[key(x, y)] && cells[key(x, y)].terrain !== 'w');
-  assert(Object.values(cells).filter(c=>c.site).every(c=>connected.has(key(c.x,c.y))), '建筑必须能够从起点抵达');
+  assert(Object.values(cells).filter(c=>c.site||c.poi).every(c=>connected.has(key(c.x,c.y))), '地点必须能够从起点抵达');
   if(options.boundaries)for(const [k,t]of Object.entries(options.boundaries))assert(cells[k]?.terrain===t,'相邻区域边界未衔接：'+k);
   if(options.gates)for(const gate of Object.values(options.gates))assert(connected.has(key(gate.x,gate.y)),'区域出入口必须连通起点');
   return { name: text(raw.name, 80), description: text(raw.description, 1000), size: n, sizeClass:Object.keys(REGION_SIZES).find(k=>REGION_SIZES[k]===n), cells };
@@ -137,7 +144,7 @@ export function campTransfer(s,id,toCamp){const c=cell(s);assert(c.camp&&!s.play
 export function build(s,recipe){assert(Object.hasOwn(RECIPES,recipe)&&!s.player.local,'请在区域地图上选择建设');const c=cell(s),r=RECIPES[recipe];assert(c.terrain!== 'w','不能在水中建设');assert(recipe==='shelter'?!c.camp:c.camp?.level===1,'当前营地不符合建设条件');for(const [id,q]of Object.entries(r.cost))assert((s.bag[id]??0)>=q,`缺少${ITEMS[id].name}，需要 ${q}`);for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;tick(s,r.minutes);c.camp??={level:0,storage:{}};c.camp.level++;log(s,`完成${r.name}。`);}
 export function rest(s){const level=!s.player.local?cell(s).camp?.level??0:0;tick(s,60,0);s.stats.stamina=Math.min(100,s.stats.stamina+15+level*12);if(level&&s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+level*4);log(s,`休息一小时${level?'，庇护所改善了恢复效果':''}。`);}
 export function survey(s,raw){assert(!s.player.local,'请在区域地图探索');const c=cell(s);assert(!c.depleted,'本格的首轮可采集资源已耗尽');const loot=validateLoot(raw);assert(weight(s.bag)+weight(loot.items)<=20,'背包空间不足，请先存放物品');for(const[id,q]of Object.entries(loot.items))s.bag[id]=(s.bag[id]??0)+q;c.surveyed=true;c.depleted=true;tick(s,25);log(s,`探索${c.name}：${loot.description}`);}
-export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,time:formatTime(s.time),weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},status:Object.fromEntries(Object.entries(s.stats).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visited:c.visited})),visibleObjects:map?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
+export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,environment:knownEnvironment(s.world.environment),time:formatTime(s.time),weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},status:Object.fromEntries(Object.entries(s.stats).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visited:c.visited,naturalPoint:c.poi?.kind??null})),visibleObjects:map?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
 export function formatTime(t){return `第 ${Math.floor(t/1440)+1} 天 · ${String(Math.floor(t%1440/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;}
 export function validateSave(s){
   if(s?.version===1){s.version=2;s.atlas={x:0,y:0,regions:{}};s.world.sizeClass='small';for(const c of Object.values(s.world.cells))if(c.site)c.site.size??='normal';}
@@ -154,6 +161,9 @@ export function validateSave(s){
     assert(a&&Number.isSafeInteger(a.x)&&Number.isSafeInteger(a.y)&&coord===key(a.x,a.y),'世界区域索引坐标无效');
     assert(regionSizes.includes(a.size)&&REGION_SIZES[a.sizeClass]===a.size&&a.total===a.size*a.size&&Object.hasOwn(TERRAINS,a.terrain),'世界区域摘要无效');
     text(a.name,80);int(a.known,0,a.total);assert(Array.isArray(a.camps)&&a.camps.length<=a.total,'营地摘要无效');
+    if(a.environment)validateEnvironment(a.environment);
+    if(a.thumbnail)assert(Array.isArray(a.thumbnail)&&a.thumbnail.length===a.size&&a.thumbnail.every(row=>typeof row==='string'&&row.length===a.size&&[...row].every(t=>t==='?'||Object.hasOwn(TERRAINS,t))),'地图缩略图无效');
+    if(a.landmarks){assert(Array.isArray(a.landmarks)&&a.landmarks.length<=a.total,'地点缩略图无效');for(const p of a.landmarks){int(p.x,0,a.size-1);int(p.y,0,a.size-1);assert(['camp','building',...Object.keys(NATURAL_POINTS)].includes(p.kind),'地点缩略图类型无效');}}
     for(const camp of a.camps){int(camp.x,0,a.size-1);int(camp.y,0,a.size-1);int(camp.level,1,2);}
     if(a.borders)for(const side of ['north','east','south','west'])assert(typeof a.borders[side]==='string'&&a.borders[side].length===a.size&&[...a.borders[side]].every(t=>Object.hasOwn(TERRAINS,t)),'区域边界摘要无效');
   }
@@ -175,6 +185,9 @@ export function validateSave(s){
   }
   assert(cell(s).terrain!=='w','玩家位置无效');if(s.player.local){const map=localMap(s);assert(map&&Array.isArray(map.grid),'室内位置丢失');int(s.player.local.x,0,map.w-1);int(s.player.local.y,0,map.h-1);const k=key(s.player.local.x,s.player.local.y),t=tileAt(map,s.player.local.x,s.player.local.y);assert('.+E'.includes(t)&&!map.containers[k]&&(t!=='+'||map.doors[k]),'玩家不能位于障碍物内');}
   for(const e of s.log){text(e.text,1500);int(e.time,0,1e9);}for(const c of s.clues){text(c.id,200);text(c.title,80);text(c.detail,800);assert(['rumor','discovery'].includes(c.kind),'线索类型无效');assert((c.x===null&&c.y===null)||(Number.isInteger(c.x)&&Number.isInteger(c.y)&&c.x>=0&&c.x<n&&c.y>=0&&c.y<n),'线索坐标无效');}
+  if(s.world.environment)validateEnvironment(s.world.environment);
+  if(s.world.ecology)validateEcology(s.world.ecology);
+  for(const c of Object.values(s.world.cells))if(c.poi){assert(c.terrain!=='w'&&Object.hasOwn(NATURAL_POINTS,c.poi.kind),'自然地点存档无效');text(c.poi.id,100);text(c.poi.name,70);text(c.poi.description,400);}
   return s;
 }
 export function demoWorld(seed='demo'){const r=seeded(seed);const terrain=Array.from({length:9},(_,y)=>Array.from({length:9},(_,x)=>x===7?'w':y===4||x===4?'r':r()<.6?'f':'.').join(''));return {name:'雾松边境',description:'沿旧公路散布的建筑与林地。河流将东侧荒地与旧聚落分开。',terrain,sites:[{x:4,y:4,name:'公路补给站',kind:'便利店',description:'铁皮招牌在风中轻响。落满灰尘的货架后面，有一扇通往仓库的门。'},{x:3,y:2,name:'废弃林务所',kind:'小屋',description:'林务所的屋顶仍然完好。'},{x:5,y:6,name:'旧维修间',kind:'车间',description:'修理设备和零件散落在屋内。'}]};}
