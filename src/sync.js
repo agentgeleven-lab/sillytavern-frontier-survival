@@ -1,18 +1,18 @@
 import { assert, text, int, hash, cell, log } from './engine.js';
 export function messageIdentity(m,index){return hash(`${m?.send_date??''}|${index}|${m?.name??''}|${!!m?.is_user}`);}
 export function messageFingerprint(m){return hash(`${m?.mes??''}|${m?.swipe_id??0}`);}
-export function validateEvents(raw,target){
+export function validateEvents(raw,target,size=9){
   assert(raw&&Array.isArray(raw.events)&&raw.events.length<=4,'聊天同步结果无效');
   return raw.events.map(e=>{
     assert(['rumor','discovery'].includes(e.kind),'不支持的同步事件');
     const quote=text(e.quote,1200);assert(quote.length>1&&target.text.includes(quote),'同步证据不在原消息中');
     const title=text(e.title,80),detail=text(e.detail,800);assert(title&&detail,'线索缺少内容');
     assert((e.x===null&&e.y===null)||(Number.isInteger(e.x)&&Number.isInteger(e.y)),'线索坐标无效');
-    return {kind:e.kind==='discovery'&&target.isUser?'discovery':'rumor',title,detail,quote,x:e.x===null?null:int(e.x,0,8),y:e.y===null?null:int(e.y,0,8)};
+    return {kind:e.kind==='discovery'&&target.isUser?'discovery':'rumor',title,detail,quote,x:e.x===null?null:int(e.x,0,size-1),y:e.y===null?null:int(e.y,0,size-1)};
   });
 }
 function canPlace(e,target,s){
-  if(e.x===null)return false;
+  if(e.x===null||!cell(s,e.x,e.y))return false;
   const known=Object.values(s.world.cells).find(c=>c.known&&c.site?.name===e.title);
   if(known)return known.x===e.x&&known.y===e.y;
   const normalized=target.text.replace(/[（(]\s*/g,'(').replace(/\s*[）)]/g,')').replace(/，/g,',').replace(/\s/g,'');
@@ -32,7 +32,7 @@ export function applyEvents(s,events,{id,fingerprint,target,name}){
       else if(!c.site){
         // Record former visibility so source removal can retract an unvisited discovery.
         clue.previous={known:c.known,name:c.name};
-        c.site={id:`chat-${clue.id}`,name:clue.title,kind:'待探索地点',description:clue.detail,origin:clue.id};c.name=clue.title;c.known=true;clue.appliedSite=c.site.id;
+        c.site={id:`chat-${clue.id}`,name:clue.title,kind:'待探索地点',size:'normal',description:clue.detail,origin:clue.id};c.name=clue.title;c.known=true;clue.appliedSite=c.site.id;
       }
       else {clue.previous={known:c.known};c.known=true;}
     }
@@ -47,4 +47,4 @@ export function revokeClue(s,id){const clue=s.clues.find(c=>c.id===id);if(!clue|
 }
 export function revokeSource(s,id){for(const c of s.clues.filter(c=>c.source===id&&!c.revoked))revokeClue(s,c.id);}
 export function reconcileSources(s,messages){const current=new Map(messages.map((m,i)=>[messageIdentity(m,i),messageFingerprint(m)]));let changed=false;for(const[id,entry]of Object.entries(s.sync)){if(current.get(id)!==entry.fingerprint){revokeSource(s,id);delete s.sync[id];changed=true;}}return changed;}
-export function manualClue(s,{title,detail,x=null,y=null}){const id=`manual-${Date.now()}`;s.clues.push({id,source:id,sourceName:'手动笔记',kind:'rumor',title:text(title,80),detail:text(detail,800),x:x===null?null:int(x,0,8),y:y===null?null:int(y,0,8),revoked:false});log(s,`记录线索：${title}。`);}
+export function manualClue(s,{title,detail,x=null,y=null}){const id=`manual-${Date.now()}`;s.clues.push({id,source:id,sourceName:'手动笔记',kind:'rumor',title:text(title,80),detail:text(detail,800),x:x===null?null:int(x,0,s.world.size-1),y:y===null?null:int(y,0,s.world.size-1),revoked:false});log(s,`记录线索：${title}。`);}

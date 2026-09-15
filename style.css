@@ -52,3 +52,9 @@
   color-scheme: light !important;
   accent-color: var(--fs-accent) !important;
 }
+.fs-root .fs-map-tabs{display:flex;align-items:center;gap:8px;margin:0 0 12px;flex-wrap:wrap}
+.fs-root .fs-map-tabs button[aria-pressed="true"]{background:var(--fs-accent);color:#fffef7;border-color:var(--fs-accent)}
+.fs-root .fs-map-tabs small{margin-left:auto}
+.fs-root .fs-map-tabs + .fs-map-layout{height:calc(100% - 50px)}
+.fs-root .fs-inspector .fs-action-list{margin-top:14px}
+@media(max-width:650px){.fs-root .fs-map-tabs + .fs-map-layout{height:auto}.fs-root .fs-map-tabs small{font-size:9px}}

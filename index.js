@@ -1,5 +1,7 @@
 import * as E from './src/engine.js';
-import { GameStore } from './src/store.js';
+import { RegionGameStore as GameStore } from './src/region-store.js';
+import * as W from './src/world.js';
+import { demoPlan, BUILDING_SIZES } from './src/layout.js';
 import { apiSettings, requestJSON, PROMPTS } from './src/api.js';
 import { createUI } from './src/ui.js';
 import { messageIdentity, messageFingerprint, validateEvents, applyEvents, reconcileSources, revokeClue, manualClue } from './src/sync.js';
@@ -23,7 +25,8 @@ export function initialize(){
   async function changeChat(){
     const serial=++switchSerial;queued.clear();clearTimeout(drainTimer);
     try{
-      store.switch(scope());
+      await store.switch(scope());
+      if(serial!==switchSerial)return;
       if(store.state&&getContext()){
         const restored=E.clone(store.state);
         if(reconcileSources(restored,getContext().chat??[]))await store.run(()=>restored);
@@ -46,16 +49,35 @@ export function initialize(){
   }
   async function create(options){
     const input={theme:options.theme==='wild'?'荒野独居，以自然环境为主，人造建筑稀少':'末日废土，城市边缘与荒野相接',background:options.background,seed:options.seed};
-    await store.run(async(_,signal)=>E.newGame(options.mode==='demo'?E.demoWorld(options.seed):await validatedRequest('world',input,E.validateWorld,signal),options),{create:true});
+    await store.run(async(_,signal)=>{
+      const spec=W.regionSpec({seed:options.seed,atlas:{regions:{}}},0,0,options.regionSize??'normal');
+      const raw=options.mode==='demo'?W.demoRegion(spec):await validatedRequest('world',{...input,constraints:spec},raw=>W.validateRegion(raw,spec),signal);
+      const game=E.newGame(raw,options);game.world=W.validateRegion(raw,spec);E.reveal(game);W.summarizeRegion(game);return game;
+    },{create:true});
     ui.setStatus(options.mode==='demo'?'已创建离线演示。地图与物资来自示例数据。':'世界已生成并保存，可以开始独立探索。');
   }
   async function act(type,p){
-    await store.run(async(s,signal)=>{
+    await store.run(async(s,signal,transaction)=>{
       E.assert(!s.ended,'本局角色已无法行动，请导出记录并开始新游戏');
       const payload={background:s.background,theme:s.theme,seed:s.seed,known:JSON.parse(E.knownContext(s))};
-      if(type==='enter'){
+      if(type==='travel'){
+        const plan=W.travelPlan(s,p.x,p.y),oldCoord=W.regionKey(s);
+        const survival=E.clone(s);E.tick(survival,plan.minutes);E.assert(!survival.ended,'当前补给或健康不足以完成旅行，未结算');
+        let data=s.atlas.regions[E.key(p.x,p.y)]?await transaction.loadRegion(s,p.x,p.y):null;
+        if(s.atlas.regions[E.key(p.x,p.y)])E.assert(data,'旧区域存档缺失，停止旅行');
+        if(!data){
+          const spec=W.regionSpec(s,p.x,p.y,p.size);
+          const raw=s.mode==='demo'?W.demoRegion(spec):await validatedRequest('world',{...payload,constraints:spec},raw=>W.validateRegion(raw,spec),signal);
+          data={world:W.validateRegion(raw,spec),locals:{},clues:[],sync:{}};
+        }
+        const old=W.installRegion(s,p.x,p.y,data,plan);transaction.stageRegion(oldCoord,old);
+        if(getContext())reconcileSources(s,getContext().chat??[]);
+      }else if(type==='buildingSize'){
+        const c=E.cell(s);E.assert(c.site&&!s.player.local&&!s.locals[c.site.id],'建筑已生成，不能改变原有布局大小');
+        E.assert(Object.hasOwn(BUILDING_SIZES,p.size),'建筑大小无效');c.site.size=p.size;
+      }else if(type==='enter'){
         const c=E.cell(s);E.assert(c.site,'当前位置没有建筑');
-        const raw=s.locals[c.site.id]?null:s.mode==='demo'?E.demoLocal():await validatedRequest('local',{...payload,site:c.site},E.validateLocal,signal);E.enter(s,raw);
+        const raw=s.locals[c.site.id]?null:s.mode==='demo'?demoPlan(c.site.size??'normal'):await validatedRequest('local',{...payload,site:c.site,size:c.site.size??'normal',maxWidth:BUILDING_SIZES[c.site.size??'normal'],maxHeight:BUILDING_SIZES[c.site.size??'normal']},raw=>E.validateLocal(raw,c.site.size??'normal'),signal);E.enter(s,raw);
       }else if(type==='search'){
         const c=E.localMap(s)?.containers[E.key(p.x,p.y)];E.assert(c&&!c.searched&&E.adjacent(s,p.x,p.y),'请站到尚未搜索的容器旁');
         const raw=s.mode==='demo'?E.demoLoot(c.name):await validatedRequest('loot',{...payload,action:'搜索容器',container:{name:c.name,kind:c.kind},site:E.cell(s).site},E.validateLoot,signal);E.searchContainer(s,p.x,p.y,raw);
@@ -79,21 +101,21 @@ export function initialize(){
   }
   async function background(){const c=getContext();E.assert(c,'未连接酒馆');const character=c.characters?.[c.characterId];E.assert(character,'请先选择角色卡；群聊可通过 JSON 文件指定背景');const main=cardBackground(character),book=character.data?.extensions?.world;if(book&&c.loadWorldInfo){const data=await c.loadWorldInfo(book);const entries=Object.values(data?.entries??{}).filter(e=>e.disable!==true&&e.enabled!==false).map(e=>`${e.comment??''}\n${e.content??''}`).join('\n\n');return (main+'\n\n'+entries).slice(0,30000);}return main;}
   function queueMessage(index){const c=getContext(),m=c?.chat?.[index];if(!preferences.sync||!m||m.is_system||!store.state||store.state.mode==='demo')return;
-    const id=messageIdentity(m,index),fingerprint=messageFingerprint(m);if(store.state.sync[id]?.fingerprint===fingerprint)return;
+    const id=messageIdentity(m,index),fingerprint=messageFingerprint(m);if(store.state.atlas.sources?.[id]&&store.state.atlas.sources[id]!==W.regionKey(store.state))return;if(store.state.sync[id]?.fingerprint===fingerprint)return;
     if(typeof m.mes!=='string'||m.mes.length<2||m.mes.length>16000)return;
-    queued.set(id,{index,id,fingerprint,scope:scope(),serial:switchSerial,target:{text:m.mes,isUser:!!m.is_user},name:m.name??'角色',surrounding:c.chat.slice(Math.max(0,index-2),index).map(e=>({name:e.name,text:String(e.mes??'').slice(-1500)}))});
+    queued.set(id,{index,id,fingerprint,region:W.regionKey(store.state),scope:scope(),serial:switchSerial,target:{text:m.mes,isUser:!!m.is_user},name:m.name??'角色',surrounding:c.chat.slice(Math.max(0,index-2),index).map(e=>({name:e.name,text:String(e.mes??'').slice(-1500)}))});
     clearTimeout(drainTimer);drainTimer=setTimeout(drain,350);
   }
   async function drain(){
     if(!queued.size)return;if(store.busy){drainTimer=setTimeout(drain,500);return;}
     const [id,job]=queued.entries().next().value;queued.delete(id);
     try{
-      if(!store.state||job.serial!==switchSerial||job.scope!==scope())return;
+      if(!store.state||job.serial!==switchSerial||job.scope!==scope()||job.region!==W.regionKey(store.state))return;
       const current=getContext()?.chat?.[job.index];if(!current||messageFingerprint(current)!==job.fingerprint)return;
       await store.run(async(s,signal)=>{
         const raw=await request('sync',{target:job.target,surrounding:job.surrounding,known:JSON.parse(E.knownContext(s))},signal);
         const latest=getContext()?.chat?.[job.index];E.assert(job.serial===switchSerial&&job.scope===scope()&&latest&&messageFingerprint(latest)===job.fingerprint,'消息已经变化，旧同步结果已丢弃');
-        const events=validateEvents(raw,job.target);applyEvents(s,events,job);
+        const events=validateEvents(raw,job.target,s.world.size);applyEvents(s,events,job);s.atlas.sources??={};s.atlas.sources[id]=W.regionKey(s);
       });ui.setStatus('聊天线索已同步。');
     }catch(e){ui.setStatus(`聊天同步未完成：${e.message} 可在「线索与日志」手动重试。`,true);}
     finally{if(queued.size)drainTimer=setTimeout(drain,350);}
@@ -125,7 +147,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.1.3',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.2.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();
