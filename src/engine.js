@@ -1,4 +1,5 @@
 import {NATURAL_POINTS,validateEnvironment,validateEcology,knownEnvironment} from './environment.js';
+import {readTerrain} from './terrain-input.js';
 import { REGION_SIZES, BUILDING_SIZES, rasterizeLayout } from './layout.js';
 // The game state is the authority. Model output is input data, never executable code.
 export const VERSION = 2;
@@ -26,10 +27,9 @@ export function validateWorld(raw, options = {}) {
   const n=options.size?REGION_SIZES[options.size]:raw?.terrain?.length;
   assert(Object.values(REGION_SIZES).includes(n),'区域尺寸必须为 9、15 或 21');
   const center=Math.floor(n/2);
-  assert(raw && Array.isArray(raw.terrain) && raw.terrain.length === n, `区域地图需要 ${n} 行地形`);
+  const terrainRows=readTerrain(raw?.terrain,n,Object.keys(TERRAINS));
   const cells = {};
-  raw.terrain.forEach((row, y) => {
-    assert(typeof row === 'string' && row.length === n && [...row].every(c => Object.hasOwn(TERRAINS, c)), `区域地形需要 ${n}×${n} 个合法格子`);
+  terrainRows.forEach((row, y) => {
     [...row].forEach((terrain, x) => { cells[key(x, y)] = { x, y, terrain, name: TERRAINS[terrain][0], known: false, visited: false, surveyed: false, depleted: false, site: null, poi: null, camp: null }; });
   });
   assert(cells[key(center,center)].terrain !== 'w', '起点不能位于水中');

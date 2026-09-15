@@ -32,7 +32,8 @@ export function regionSpec(s,x,y,size=regionSize(s.seed,x,y)){
     }
   }
   const neighbors=Object.entries(DIRECTIONS).flatMap(([side,d])=>{const a=s.atlas.regions[key(x+d.dx,y+d.dy)];return a?[{side,name:a.name,size:a.size,terrain:a.terrain}]:[];});
-  return {x,y,size,dimension:n,environment,seed:`${s.seed}:region:${x},${y}`,boundaries,edges,gates,neighbors};
+  const terrainTemplate=Array.from({length:n},(_,y)=>Array.from({length:n},(_,x)=>boundaries[key(x,y)]??environment.baseTerrain).join(''));
+  return {x,y,size,dimension:n,terrainTemplate,environment,seed:`${s.seed}:region:${x},${y}`,boundaries,edges,gates,neighbors};
 }
 export function validateRegion(raw,spec){
   const world=validateWorld(raw,{size:spec.size,boundaries:spec.boundaries,gates:spec.gates}),e=spec.environment;
