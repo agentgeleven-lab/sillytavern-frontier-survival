@@ -4,3 +4,51 @@
 @media(max-width:650px){.fs-root{inset:0;border-radius:0}.fs-root .fs-header{height:64px;padding:0 13px}.fs-root .fs-brand b{font-size:16px}.fs-root .fs-brand b span{display:none}.fs-root .fs-header button{font-size:10px;padding:5px 8px;min-height:30px}.fs-root .fs-shell{height:calc(100% - 64px);flex-direction:column}.fs-root .fs-nav{width:auto;flex-direction:row;padding:6px;border-right:0;border-bottom:1px solid #d4d9c9;gap:2px;overflow:auto}.fs-root .fs-nav button{padding:8px;font-size:10px;justify-content:center;flex:1}.fs-root .fs-nav button small,.fs-root .fs-nav-bottom{display:none}.fs-root .fs-main{padding:14px 12px 0}.fs-root h1{font-size:21px}.fs-root .fs-heading-info{font-size:9px}.fs-root .fs-heading{margin-bottom:12px}.fs-root .fs-statusbar{gap:10px;padding:10px 0;margin-bottom:12px}.fs-root .fs-stat{min-width:40px}.fs-root .fs-load{display:none}.fs-root .fs-map-layout{display:flex;flex-direction:column;height:auto;min-height:100%;gap:12px}.fs-root .fs-map-card{height:380px;flex:none}.fs-root .fs-inspector{overflow:visible;padding:8px}.fs-root .fs-page-grid,.fs-root .fs-setup{grid-template-columns:1fr}.fs-root .fs-setup-art{min-height:200px}.fs-root .fs-feedback{font-size:10px}.fs-root .fs-form .fs-row{flex-wrap:wrap}}
 
 .fs-root button.fs-primary:hover:not(:disabled){background:#3c533b;border-color:#3c533b;color:#fffbed}
+
+/* Keep form colors independent of the host's dark theme and generic input rules. */
+.fs-root {
+  --fs-field-bg: #fffef7;
+  --fs-field-ink: #34482f;
+  --fs-field-border: #cbd3bf;
+  --fs-field-placeholder: #77816e;
+  --fs-disabled-bg: #e8ebdf;
+  --fs-disabled-ink: #69765f;
+  color-scheme: light;
+}
+.fs-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea) {
+  background: var(--fs-field-bg) !important;
+  color: var(--fs-field-ink) !important;
+  -webkit-text-fill-color: var(--fs-field-ink) !important;
+  border-color: var(--fs-field-border) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  color-scheme: light !important;
+}
+.fs-root :is(input, textarea)::placeholder {
+  color: var(--fs-field-placeholder) !important;
+  -webkit-text-fill-color: var(--fs-field-placeholder) !important;
+  opacity: 1 !important;
+}
+.fs-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):focus {
+  border-color: var(--fs-accent) !important;
+  outline: 2px solid #8ba07577 !important;
+  outline-offset: 1px;
+}
+.fs-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea, button):disabled {
+  background: var(--fs-disabled-bg) !important;
+  color: var(--fs-disabled-ink) !important;
+  -webkit-text-fill-color: var(--fs-disabled-ink) !important;
+  border-color: var(--fs-field-border) !important;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+.fs-root select option {
+  background: var(--fs-field-bg) !important;
+  color: var(--fs-field-ink) !important;
+  -webkit-text-fill-color: var(--fs-field-ink) !important;
+}
+.fs-root .fs-check input {
+  color-scheme: light !important;
+  accent-color: var(--fs-accent) !important;
+}
