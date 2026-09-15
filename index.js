@@ -1,4 +1,5 @@
 import {createDiagnostics,diagnosedRequest} from './src/diagnostics.js';
+import * as F from './src/field.js';
 import * as E from './src/engine.js';
 import { RegionGameStore as GameStore } from './src/region-store.js';
 import * as W from './src/world.js';
@@ -73,15 +74,19 @@ export function initialize(){
         }
         const old=W.installRegion(s,p.x,p.y,data,plan);transaction.stageRegion(oldCoord,old);
         if(getContext())reconcileSources(s,getContext().chat??[]);
-      }else if(type==='enter'){
+      }else if(type==='field'||type==='cave'){
+        const zone=type==='cave'?'cave':'field',spec=F.fieldConstraints(s,E.cell(s),zone);
+        const raw=s.locals[spec.id]?null:s.mode==='demo'?F.demoField(s,zone):await validatedRequest('field',{...payload,constraints:spec},raw=>F.validateField(raw,s,zone),signal);F.enterField(s,raw,zone);
+      }else if(type==='gather')F.gather(s,p.x,p.y);
+      else if(type==='weave')F.weave(s);
+      else if(type==='enter'){
         const c=E.cell(s);E.assert(c.site,'当前位置没有建筑');
         const raw=s.locals[c.site.id]?null:s.mode==='demo'?demoPlan(c.site.size??'normal'):await validatedRequest('local',{...payload,site:c.site,size:c.site.size??'normal',maxWidth:BUILDING_SIZES[c.site.size??'normal'],maxHeight:BUILDING_SIZES[c.site.size??'normal']},raw=>E.validateLocal(raw,c.site.size??'normal'),signal);E.enter(s,raw);
       }else if(type==='search'){
         const c=E.localMap(s)?.containers[E.key(p.x,p.y)];E.assert(c&&!c.searched&&E.adjacent(s,p.x,p.y),'请站到尚未搜索的容器旁');
         const raw=s.mode==='demo'?E.demoLoot(c.name):await validatedRequest('loot',{...payload,action:'搜索容器',container:{name:c.name,kind:c.kind},site:E.cell(s).site},E.validateLoot,signal);E.searchContainer(s,p.x,p.y,raw);
       }else if(type==='survey'){
-        E.assert(!s.player.local&&!E.cell(s).depleted,'本格已调查或不在区域地图');
-        const raw=s.mode==='demo'?W.naturalLoot(E.cell(s)):await validatedRequest('loot',{...payload,action:'调查与采集',terrain:E.cell(s).terrain,point:E.cell(s).poi??null,environment:s.world.environment??null},E.validateLoot,signal);E.survey(s,raw);
+        F.quickGather(s);
       }else if(type==='build'){
         // Validate and debit only a draft; API failure discards the draft including time/material changes.
         const recipe=E.RECIPES[p.recipe];E.assert(recipe,'未知建设配方');E.build(s,p.recipe);
@@ -145,7 +150,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.3.2',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.4.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

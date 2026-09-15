@@ -1,4 +1,5 @@
 import {TERRAINS,key,cell,localMap,visible} from './engine.js';
+import {RESOURCES} from './field-data.js';
 import {randomAt} from './environment.js';
 
 const colors={'.':'#a6af81',f:'#7e956d',r:'#9fa47e',w:'#6d9a9d',h:'#a39a82',s:'#c9ba90',n:'#c3d0c1',m:'#8eaa89',a:'#b5aa75',u:'#aaa591'};
@@ -42,6 +43,16 @@ function indoor(g,map,x,y){const t=map.grid[y][x];g.fillStyle=t==='_'?'#d1d0bb':
   if(t==='E'){g.fillStyle='#71947c';g.fillRect(.08,.08,.84,.84);path(g,[[.5,.16],[.23,.48],[.41,.48],[.41,.77],[.59,.77],[.59,.48],[.77,.48]],'#e6e7c3');}
   const c=map.containers[key(x,y)];if(c){g.fillStyle='#4d503d44';g.fillRect(.19,.24,.74,.68);g.fillStyle=c.searched?'#968565':'#9f7850';g.fillRect(.12,.12,.72,.7);g.strokeStyle='#dcc095';g.strokeRect(.16,.16,.64,.62);if(/箱/.test(c.kind)){path(g,[[.2,.23],[.76,.71]],null,'#d7b788');path(g,[[.76,.23],[.2,.71]],null,'#d7b788');}else{for(const i of [.35,.58]){g.beginPath();g.moveTo(.16,i);g.lineTo(.79,i);g.stroke();g.fillStyle='#e3cc97';g.fillRect(.4,i+.07,.17,.028);}}}
 }
+function outdoor(g,s,map,x,y){
+  const c=cell(s),t=map.grid[y][x],cave=map.kind==='cave';
+  // Ground and obstacles have separate visual roles: walkable forest is a clearing, not a tree icon.
+  terrain(g,cave?'u':['f','m'].includes(c.terrain)?'.':c.terrain,x,y,s.seed);
+  if(cave){g.fillStyle='#4b514d88';g.fillRect(0,0,1,1);}
+  if(t==='#'){if(!cave&&['f','.','m','a'].includes(c.terrain)){g.fillStyle='#69805b';g.fillRect(0,0,1,1);tree(g,.35,.58,1.3);tree(g,.72,.65,1.1);}else{g.fillStyle=cave?'#424c46':'#918c74';g.fillRect(0,0,1,1);rock(g,.48,.52,2);rock(g,.78,.79,.8);}}
+  if(t==='E'){g.fillStyle='#d4c69c';g.fillRect(.12,.12,.76,.76);path(g,[[.5,.8],[.22,.48],[.41,.48],[.41,.2],[.59,.2],[.59,.48],[.78,.48]],'#46674f');if(!cave&&c.camp)camp(g);}
+  for(const p of map.portals)if(p.x===x&&p.y===y){if(p.kind==='cave')pointArt(g,'cave');else roof(g,c.site?.size==='large');}
+  const o=map.containers[key(x,y)];if(o){const n=c.resources.nodes[o.resourceId];g.save();if(!n.remaining)g.globalAlpha=.32;const art=RESOURCES[n.kind].art;if(art==='stone')rock(g,.5,.52,1.7);else pointArt(g,art);g.restore();if(!n.remaining){g.strokeStyle='#6b705c';g.lineWidth=.035;g.beginPath();g.moveTo(.28,.72);g.lineTo(.72,.28);g.stroke();}}
+}
 function prepare(canvas){const b=canvas.parentElement.getBoundingClientRect();if(b.width<1||b.height<1)return null;const dpr=window.devicePixelRatio||1;canvas.width=Math.round(b.width*dpr);canvas.height=Math.round(b.height*dpr);canvas.style.width=b.width+'px';canvas.style.height=b.height+'px';const g=canvas.getContext('2d');g.scale(dpr,dpr);g.fillStyle='#e2deca';g.fillRect(0,0,b.width,b.height);return {g,b};}
 function marker(g,x,y,r){ellipse(g,x,y,r*1.2,r*1.2,'#fff0c2');ellipse(g,x,y,r,r,'#385c49');path(g,[[x,y-r*.65],[x-r*.5,y+r*.5],[x,y+r*.17],[x+r*.5,y+r*.5]],'#f5e7b5');}
 export function paintMap(canvas,s,{pan,selection,mapLevel}){
@@ -49,7 +60,7 @@ export function paintMap(canvas,s,{pan,selection,mapLevel}){
   const neighbor=(x,y)=>cell(s,x,y)?.known?cell(s,x,y).terrain:null;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     g.save();g.translate(ox+x*unit,oy+y*unit);g.scale(unit,unit);g.beginPath();g.rect(0,0,1,1);g.clip();const c=map?null:cell(s,x,y),known=map?map.seen[key(x,y)]:c.known;
-    if(!known)fog(g,x,y,s.seed);else if(map){indoor(g,map,x,y);if(!visible(map,s.player.local,x,y)){g.fillStyle='#47584366';g.fillRect(0,0,1,1);}}
+    if(!known)fog(g,x,y,s.seed);else if(map){if(map.kind)outdoor(g,s,map,x,y);else indoor(g,map,x,y);if(!visible(map,s.player.local,x,y)){g.fillStyle='#47584366';g.fillRect(0,0,1,1);}}
     else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);}
     g.strokeStyle='#59694d12';g.lineWidth=.008;g.strokeRect(0,0,1,1);
     if(!map&&s.clues.some(c=>!c.revoked&&c.x===x&&c.y===y))ellipse(g,.84,.16,.07,.07,'#b68b42');

@@ -29,6 +29,7 @@ export function applyEvents(s,events,{id,fingerprint,target,name}){
     if(clue.kind==='discovery'&&clue.x!==null){
       const c=cell(s,clue.x,clue.y);
       if(c.terrain==='w'||(c.site&&c.site.name!==clue.title)||(c.poi&&c.poi.name!==clue.title)){clue.conflict='与已有地形或地点冲突，保留为待核对记录';}
+      else if(!c.site&&!c.poi&&s.locals[`field-${c.x}-${c.y}`]){clue.conflict='此地块已经实地生成，保留为待核对线索，不改写原有布局';}
       else if(!c.site&&!c.poi){
         // Record former visibility so source removal can retract an unvisited discovery.
         clue.previous={known:c.known,name:c.name};
