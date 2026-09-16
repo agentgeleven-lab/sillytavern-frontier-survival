@@ -1,3 +1,4 @@
+import {campBed} from './camp-rooms.js';
 import {timeFrozen,applyDevLocks} from './developer-data.js';
 import {hasFacility} from './shelter-data.js';
 import {healWounds,injuryState} from './injury-data.js';
@@ -23,7 +24,7 @@ function settle(s,minutes,turnOff){
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
     E.tick(s,1,0,false);
     if(s.ended){reason='health';break;}
-    changeSpirit(s,((['building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
+    changeSpirit(s,((['covered','building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
     s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1));
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
     healWounds(s,1,hasFacility(s,'bed'));applyDevLocks(s);
@@ -38,6 +39,7 @@ export function sleepPreview(s,choice='8h',turnOff=true){
     if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);
     if(!turnOff){const warning=lightWarning(s,report.end-report.start);if(warning)warnings.push(warning.replace(/抵达/g,'醒来'));}
     if(injuryState(s).bleeding||injuryState(s).infection)warnings.push('仍有出血或感染，睡眠期间会持续损失健康；建议先治疗');
+    const bed=campBed(s);if(bed)warnings.push(`使用${bed.bed.name} (${bed.bed.x},${bed.bed.y})：${bed.label}；封闭且屋顶完整才享受营地等级加成`);
     if(hasFacility(s,'bed'))warnings.push('床铺生效：每小时额外恢复 6 体力、2 精神，创伤休养速度加倍');
     const fire=E.localMap(s)?.fire;if(fire?.lit&&fireRemaining(s,fire)>0&&fireRemaining(s,fire)<=report.end-report.start)warnings.push('当地营火将在醒来前或醒来时燃尽');
     return {...report,warnings,activeLight:lightState(s).active,error:null};

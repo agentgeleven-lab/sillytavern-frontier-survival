@@ -1,5 +1,7 @@
+import {campBed} from './camp-rooms.js';
 import {nearCampFacility} from './camp-data.js';
 export const SLEEP_PLACES={
+  covered:{name:'有顶休息处（漏风）',stamina:24,health:2},
   outdoor:{name:'露天',stamina:18,health:0},
   cave:{name:'洞穴',stamina:20,health:0},
   building:{name:'建筑内部',stamina:24,health:2},
@@ -9,8 +11,7 @@ export const SLEEP_PLACES={
 export const SLEEP_LIMIT=720,WAKE_THRESHOLD=5;
 export function sleepPlace(s){
   const map=s.player.local?s.locals[s.player.local.site]:null;
-  // Regional camps have no local footprint yet: use them only on the region layer.
-  if(!map){if(s.world.cells[`${s.player.x},${s.player.y}`].camp?.layout&&!nearCampFacility(s,'bed'))return 'outdoor';const level=s.world.cells[`${s.player.x},${s.player.y}`].camp?.level;return level===2?'fortified':level===1?'shelter':'outdoor';}
+  if(!map){const c=s.world.cells[`${s.player.x},${s.player.y}`].camp;if(c?.layout){const bed=campBed(s);return bed?.kind==='room'?(c.level===2?'fortified':'shelter'):bed?.kind==='covered'?'covered':'outdoor';}const level=c?.level;return level===2?'fortified':level===1?'shelter':'outdoor';}
   if(map.grid[s.player.local.y][s.player.local.x]==='E')return 'outdoor';
   return map.kind==='field'?'outdoor':map.kind==='cave'?'cave':'building';
 }

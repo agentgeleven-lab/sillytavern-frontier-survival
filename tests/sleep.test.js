@@ -37,7 +37,7 @@ test('invalid choices, dead characters and bad records are rejected; old saves r
  const s=game();E.validateSave(s);const original=E.clone(s);for(const c of ['0h','100h','unknown'])assert.throws(()=>sleep(s,c));assert.throws(()=>sleep(s,'2h','false'));assert.deepEqual(s,original);s.ended=true;assert.throws(()=>sleep(s,'2h'),/无法行动/);s.ended=false;sleep(s,'2h');const record=E.clone(s.lastSleep);s.lastSleep.end=s.time+1;assert.throws(()=>E.validateSave(s),/睡眠/);s.lastSleep=record;E.validateSave(s);const restored=JSON.parse(JSON.stringify(s));E.validateSave(restored);assert.deepEqual(restored.lastSleep,record);assert.deepEqual(JSON.parse(E.knownContext(restored)).lastSleep,record);
 });
 test('sleep panel offers dawn limits, blocked states, exact previews and last sleep report',()=>{
- const s=game();assert.match(sleepPanel(s),/预计醒来/);assert.equal(Object.keys(SLEEP_PLACES).length,5);s.time=480;assert.match(sleepPanel(s),/value="dawn"\s+disabled/);s.stats.water=1;assert.match(sleepPanel(s),/data-action="sleep" disabled/);s.stats.water=80;sleep(s,'2h');assert.match(sleepPanel(s),/上次睡眠/);
+ const s=game();assert.match(sleepPanel(s),/预计醒来/);assert.equal(Object.keys(SLEEP_PLACES).length,6);s.time=480;assert.match(sleepPanel(s),/value="dawn"\s+disabled/);s.stats.water=1;assert.match(sleepPanel(s),/data-action="sleep" disabled/);s.stats.water=80;sleep(s,'2h');assert.match(sleepPanel(s),/上次睡眠/);
 });
 test('short rest cannot heal a character after starvation has ended the game',()=>{
  const s=game();s.stats.health=1;s.stats.water=0;E.cell(s).camp={level:2,storage:{}};E.rest(s);assert.equal(s.stats.health,0);assert.equal(s.ended,true);
