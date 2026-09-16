@@ -6,7 +6,7 @@ import {lightState} from './lighting-data.js';
 export const campBag=(camp,o)=>o.legacy?camp.storage:o.items;
 export function ensureCamp(s){const c=campAt(s);E.assert(c,'请先建设庇护所');if(c.layout)return c.layout;settleFood(s,c.storage);c.layout={version:1,serial:10,seen:{},objects:[{id:'legacy',type:'box',x:5,y:12,rot:0,name:'旧储物箱',legacy:true}]};c.provisions.rate=1;const spots={bed:[3,3],cellar:[10,3],bench:[3,7],stove:[10,7],smoker:[10,10]};for(const[type,[x,y]]of Object.entries(spots))if(c.facilities?.[type])c.layout.objects.push({id:'old-'+type,type,x,y,rot:0,name:FURNITURE[type].name,...(FURNITURE[type].capacity?{items:{}}:{})});return c.layout;}
 export const campStepMinutes=()=>0;
-function target(s,p){const o=campAt(s).layout.objects.find(o=>o.id===p.id);E.assert(o,'家具不存在');E.assert(canUseCampObject(s,o),'请先走到家具旁边');return o;}
+function target(s,p,near=true){const o=campAt(s).layout.objects.find(o=>o.id===p.id);E.assert(o,'家具不存在');E.assert(!near||canUseCampObject(s,o),'请先走到家具旁边');return o;}
 export function campAction(s,action,p={}){
  if(action==='campSetMode'){E.assert(s.player.camp&&['map','simple'].includes(p.mode),'营地模式无效');s.campMode=p.mode;return;}
  E.assert(!s.ended,'角色已无法行动');
@@ -16,9 +16,9 @@ export function campAction(s,action,p={}){
  if(action==='campMove'){const to={x:Number(p.x),y:Number(p.y)};E.assert(campVisible(s,to.x,to.y),'只能向当前可见位置移动');const path=campPath(l,s.player.camp,to);E.assert(path?.length,'这里不可到达');for(const next of path){if(!campVisible(s,next.x,next.y))break;s.player.camp=next;revealCamp(s);if(s.ended)break;}return;}
  if(action==='campAutoPlace'){E.assert(simpleCamp(s),'请切换简易模式');E.assert(Object.hasOwn(FURNITURE,p.type),'未知家具');for(let y=1;y<14;y++)for(let x=1;x<14;x++)for(const rot of [0,1]){if(!placementError(l,{type:p.type,x,y,rot,id:'preview'},s.player.camp)){campAction(s,'campPlace',{type:p.type,x,y,rot});return;}}throw Error('营地没有合适的空位，请切换地图模式整理布局');}
  if(action==='campPlace'||action==='campRelocate'){
-  const old=action==='campRelocate'?target(s,p):null,type=old?.type??p.type;E.assert(Object.hasOwn(FURNITURE,type),'未知家具');const f=FURNITURE[type],o={...(old??{}),id:old?.id??'f'+(l.serial+1),type,x:Number(p.x),y:Number(p.y),rot:Number(p.rot),name:old?.name??f.name};
+  const old=action==='campRelocate'?target(s,p,false):null,type=old?.type??p.type;E.assert(Object.hasOwn(FURNITURE,type),'未知家具');const f=FURNITURE[type],o={...(old??{}),id:old?.id??'f'+(l.serial+1),type,x:Number(p.x),y:Number(p.y),rot:Number(p.rot),name:old?.name??f.name};
   E.assert(!old?.legacy||!Object.values(camp.storage).some(q=>q>0),'请先清空旧储物箱再搬动');E.assert(!old?.items||!Object.values(old.items).some(q=>q>0),'请先清空容器再搬动');
-  E.assert(simpleCamp(s)||Math.abs(o.x-s.player.camp.x)+Math.abs(o.y-s.player.camp.y)<=3,'请走近施工位置（三格以内）');E.assert(simpleCamp(s)||campVisible(s,o.x,o.y),'施工位置不可见');const error=placementError(l,o,s.player.camp,old?.id);E.assert(!error,error);
+  const error=placementError(l,o,s.player.camp,old?.id);E.assert(!error,error);
   if(!old){if(type==='smoker')E.assert(l.objects.some(o=>o.type==='stove'),'先建设灶台');for(const[id,q]of Object.entries(f.cost))E.assert((s.bag[id]??0)>=q,'建设材料不足');for(const[id,q]of Object.entries(f.cost))s.bag[id]-=q;}
   E.tick(s,old?10:f.minutes);if(s.ended){E.log(s,'施工中健康耗尽，未完成。');return;}if(!old){l.serial++;if(f.capacity)o.items={};if(type==='door')o.open=false;l.objects.push(o);}else Object.assign(old,o);E.log(s,`${old?'搬动':'建成'}${o.name}。`);
  }else if(action==='campRemove'){
