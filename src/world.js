@@ -1,5 +1,5 @@
 import {environmentAt,habitatFor,noise,NATURAL_POINTS,BIOMES,LAND_USE} from './environment.js';
-import {assert,key,hash,seeded,validateWorld,cell,flood,pathfind,tick,reveal,log,clone,validateSave} from './engine.js';
+import {stepMinutes,assert,key,hash,seeded,validateWorld,cell,flood,pathfind,tick,reveal,log,clone,validateSave} from './engine.js';
 import {REGION_SIZES} from './layout.js';
 export const DIRECTIONS={north:{dx:0,dy:-1,opposite:'south',name:'北'},east:{dx:1,dy:0,opposite:'west',name:'东'},south:{dx:0,dy:1,opposite:'north',name:'南'},west:{dx:-1,dy:0,opposite:'east',name:'西'}};
 export const regionKey=s=>key(s.atlas.x,s.atlas.y);
@@ -65,12 +65,12 @@ export function travelPlan(s,x,y){
   assert(side,'每次只能前往上下左右相邻区域');ensureGates(s);
   const exit=s.world.gates[side];assert(exit,'旧区域这一侧没有可达出口，请从其他方向探索');
   const path=pathfind(s.player,exit,(a,b)=>cell(s,a,b)&&cell(s,a,b).terrain!=='w');assert(path,'无法抵达区域出口');
-  const minutes=30+path.reduce((n,p)=>n+(cell(s,p.x,p.y).terrain==='h'?12:6),0);
+  const minutes=30+path.reduce((n,p)=>n+stepMinutes(s,p.x,p.y,false),0);
   return {side,path,minutes};
 }
 export function installRegion(s,x,y,data,plan){
   // All travel mutations happen on a transaction draft, after generation/validation succeeded.
-  for(const p of plan.path){s.player.x=p.x;s.player.y=p.y;tick(s,cell(s,p.x,p.y).terrain==='h'?12:6);reveal(s);}
+  for(const p of plan.path){s.player.x=p.x;s.player.y=p.y;tick(s,stepMinutes(s,p.x,p.y,false));reveal(s);}
   tick(s,30);assert(!s.ended,'当前补给或健康不足以完成旅行，未结算');
   summarizeRegion(s);
   const old=regionData(s);

@@ -128,11 +128,13 @@ export function enter(s, raw) {
 export function localPath(s,x,y) {const map=localMap(s);if(!map)return null;return pathfind(s.player.local,{x,y},(a,b)=>map.seen[key(a,b)]&&'.+E'.includes(tileAt(map,a,b))&&(tileAt(map,a,b)!=='+'||map.doors[key(a,b)])&&!map.containers[key(a,b)]);}
 export function approachPath(s,x,y){const map=localMap(s);if(!map||!map.seen[key(x,y)])return null;return [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy])=>localPath(s,x+dx,y+dy)).filter(p=>p!==null).sort((a,b)=>a.length-b.length)[0]??null;}
 export function regionPath(s,x,y) {return pathfind(s.player,{x,y},(a,b)=>{const c=cell(s,a,b);return c?.known&&c.terrain!=='w';});}
+export function stepMinutes(s,x,y,local=!!s.player.local){return local?1:cell(s,x,y).terrain==='h'?12:6;}
+export function routeMinutes(s,path){return path?.length?path.reduce((sum,p)=>sum+stepMinutes(s,p.x,p.y),0):0;}
 export function move(s,x,y) {
   assert(Number.isInteger(x)&&Number.isInteger(y),'目标坐标无效');
   const p=s.player.local, path=p?localPath(s,x,y):regionPath(s,x,y);
   assert(path&&path.length,'没有可通行的已知路线');
-  for(const step of path){if(s.ended)break;if(p){p.x=step.x;p.y=step.y;tick(s,1);revealLocal(s);}else{s.player.x=step.x;s.player.y=step.y;tick(s,cell(s).terrain==='h'?12:6);reveal(s);}}
+  for(const step of path){if(s.ended)break;if(p){p.x=step.x;p.y=step.y;tick(s,1);revealLocal(s);}else{s.player.x=step.x;s.player.y=step.y;tick(s,stepMinutes(s,step.x,step.y));reveal(s);}}
   log(s,p?`移动到地点位置 ${p.x},${p.y}。`:`抵达${cell(s).name}（${s.player.x},${s.player.y}）。`);
 }
 export function adjacent(s,x,y) {const p=s.player.local;return p&&Math.abs(p.x-x)+Math.abs(p.y-y)===1;}
