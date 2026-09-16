@@ -1,4 +1,4 @@
-const VERSION='0.7.0',LIMIT=30,MAX_TEXT=60000;
+const VERSION='0.8.0',LIMIT=30,MAX_TEXT=60000;
 const secretField=/api.?key|authorization|password|secret|token|cookie/i;
 export function sanitize(value,secrets=[]){
   const variants=secrets.filter(s=>typeof s==='string'&&s).flatMap(s=>{const values=[s,JSON.stringify(s).slice(1,-1)];try{values.push(encodeURIComponent(s));}catch{}return values;}).sort((a,b)=>b.length-a.length);

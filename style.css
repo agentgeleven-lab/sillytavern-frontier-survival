@@ -91,3 +91,5 @@
 .fs-root .fs-guide-tools{margin-bottom:18px}.fs-root .fs-guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.fs-root .fs-guide-copy{white-space:pre-line;overflow-wrap:anywhere;line-height:1.9}.fs-root .fs-route-estimate{padding:10px 12px;border-left:3px solid #7d926b;background:#e8eddf;color:#405440;font-size:12px;line-height:1.7}@media(max-width:900px){.fs-root .fs-guide-grid{grid-template-columns:1fr}}
 
 .fs-root .fs-light-panel{margin-top:18px;padding-top:12px;border-top:1px solid #a6b09755}.fs-root .fs-light-panel button{margin:3px 0}.fs-root .fs-light-panel p{font-size:12px;line-height:1.7}
+
+.fs-root .fs-sleep-panel{grid-column:1/-1}.fs-root .fs-sleep-preview{padding:14px 16px;margin:16px 0;background:var(--fs-bg,#eeeee4);border:1px solid var(--fs-line,#cbd0be);border-radius:10px}.fs-root .fs-sleep-warning{color:#92603c}.fs-root .fs-sleep-last{border-top:1px solid var(--fs-line,#cbd0be);margin-top:18px;padding-top:6px}
