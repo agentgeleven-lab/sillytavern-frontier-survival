@@ -13,7 +13,7 @@ export function campAction(s,action,p={}){
  if(action==='campEnter'){E.assert(!s.player.local&&!s.player.camp,'请先返回区域地图');ensureCamp(s);s.player.camp={...CAMP_EXIT};revealCamp(s);E.log(s,'进入庇护所营地。');return;}
  E.assert(s.player.camp&&campAt(s)?.layout,'请先进入营地');const camp=campAt(s),l=camp.layout;
  if(action==='campExit'){E.assert(simpleCamp(s)||s.player.camp.x===7&&s.player.camp.y===14,'请先走到南侧入口');delete s.player.camp;E.log(s,'离开营地，返回区域地图。');return;}
- if(action==='campMove'){const to={x:Number(p.x),y:Number(p.y)};E.assert(campVisible(s,to.x,to.y),'只能向当前可见位置移动');const path=campPath(l,s.player.camp,to);E.assert(path?.length,'这里不可到达');for(const next of path){if(!campVisible(s,next.x,next.y))break;s.player.camp=next;revealCamp(s);if(s.ended)break;}return;}
+ if(action==='campMove'){const to={x:Number(p.x),y:Number(p.y)};E.assert(campVisible(s,to.x,to.y),'目标超出营地范围');const path=campPath(l,s.player.camp,to);E.assert(path?.length,'这里不可到达');for(const next of path){s.player.camp=next;revealCamp(s);if(s.ended)break;}return;}
  if(action==='campAutoPlace'){E.assert(simpleCamp(s),'请切换简易模式');E.assert(Object.hasOwn(FURNITURE,p.type),'未知家具');for(let y=1;y<14;y++)for(let x=1;x<14;x++)for(const rot of [0,1]){if(!placementError(l,{type:p.type,x,y,rot,id:'preview'},s.player.camp)){campAction(s,'campPlace',{type:p.type,x,y,rot});return;}}throw Error('营地没有合适的空位，请切换地图模式整理布局');}
  if(action==='campPlace'||action==='campRelocate'){
   const old=action==='campRelocate'?target(s,p,false):null,type=old?.type??p.type;E.assert(Object.hasOwn(FURNITURE,type),'未知家具');const f=FURNITURE[type],o={...(old??{}),id:old?.id??'f'+(l.serial+1),type,x:Number(p.x),y:Number(p.y),rot:Number(p.rot),name:old?.name??f.name};

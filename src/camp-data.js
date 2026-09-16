@@ -1,4 +1,3 @@
-import {localSight} from './daylight.js';
 export const CAMP_SIZE=15, CAMP_EXIT={x:7,y:14};
 export const FURNITURE={
  floor:{name:'木地板',w:1,h:1,cost:{wood:1},minutes:5},wall:{name:'木墙',w:1,h:1,cost:{wood:2},minutes:15},door:{name:'木门',w:1,h:1,cost:{wood:2,scrap:1},minutes:15},
@@ -13,9 +12,7 @@ export const canUseCampObject=(s,o)=>!!s.player.camp&&(simpleCamp(s)||nearObject
 export const nearCampFacility=(s,type)=>!!s.player.camp&&!!campAt(s)?.layout?.objects.some(o=>o.type===type&&canUseCampObject(s,o));
 export function passable(l,x,y,doors=false){if(x<0||y<0||x>=CAMP_SIZE||y>=CAMP_SIZE||(!x||!y||x===14||y===14)&&!(x===7&&y===14))return false;const o=objectAt(l,x,y);return !o||o.type==='floor'||o.type==='door'&&(o.open||doors);}
 export function campPath(l,from,to,doors=false){if(!passable(l,to.x,to.y,doors))return null;const q=[{...from,path:[]}],seen=new Set([`${from.x},${from.y}`]);for(let i=0;i<q.length;i++){const p=q[i];if(p.x===to.x&&p.y===to.y)return p.path;for(const[dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]]){const x=p.x+dx,y=p.y+dy,k=`${x},${y}`;if(!seen.has(k)&&passable(l,x,y,doors)){seen.add(k);q.push({x,y,path:[...p.path,{x,y}]});}}}return null;}
-const mapCache=new WeakMap();
-export function campMap(l){const signature=l.objects.map(o=>`${o.type}:${o.x},${o.y}:${o.rot}:${o.open}`).join('|'),cached=mapCache.get(l);if(cached?.signature===signature)return cached.map;const grid=Array.from({length:15},(_,y)=>Array.from({length:15},(_,x)=>{const o=objectAt(l,x,y);return o?.type==='wall'||o?.type==='door'&&!o.open?'#':'.';}).join(''));const map={kind:'field',w:15,h:15,grid,doors:{},exit:CAMP_EXIT};mapCache.set(l,{signature,map});return map;}
-export const campVisible=(s,x,y)=>!!s.player.camp&&localSight(s,campMap(campAt(s).layout),s.player.camp,x,y);
+export const campVisible=(s,x,y)=>!!s.player.camp&&Number.isInteger(x)&&Number.isInteger(y)&&x>=0&&y>=0&&x<CAMP_SIZE&&y<CAMP_SIZE;
 export function revealCamp(s){const l=campAt(s)?.layout;if(!s.player.camp||!l)return;for(let y=0;y<15;y++)for(let x=0;x<15;x++)if(campVisible(s,x,y))l.seen[`${x},${y}`]=true;}
 export function placementError(l,o,player,ignore=null){
  if(!Object.hasOwn(FURNITURE,o.type)||!Number.isInteger(o.x)||!Number.isInteger(o.y)||![0,1].includes(o.rot))return '家具参数无效';
