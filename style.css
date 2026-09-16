@@ -132,3 +132,5 @@
 .fs-root .fs-body-parts button[aria-pressed="true"] small{color:#e9ecdf}
 
 .fs-root .fs-camp-tabs button[aria-pressed="true"]:hover:not(:disabled){background:var(--fs-accent);color:#fffdf3}
+
+.fs-gear-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:8px}.fs-gear-slots>div,.fs-npc-card{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid #bdc7ad;border-radius:10px;margin-bottom:8px;background:#f4f3e9}.fs-gear-slots small,.fs-npc-card small{color:#68765c}.fs-npc-card progress{width:100%;height:9px;accent-color:#58724d}.fs-npc-card.fs-hostile{border-color:#b78571}.fs-npc-card.fs-hostile progress{accent-color:#ad634c}

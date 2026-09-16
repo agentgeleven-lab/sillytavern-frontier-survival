@@ -1,0 +1,12 @@
+import {randomAt} from './environment.js';
+import {inflictWound} from './injury-data.js';
+import {BODY_PARTS} from './body-data.js';
+import {protect} from './durable-data.js';
+import {applyDevLocks} from './developer-data.js';
+export const distance=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+export const blocked=(m,x,y)=>!('.E'.includes(m.grid[y]?.[x])||m.grid[y]?.[x]==='+'&&m.doors[`${x},${y}`])||!!m.containers[`${x},${y}`]&&!m.containers[`${x},${y}`].removed;
+export function occupied(s,m,x,y,except){return (s.player.local&&s.locals[s.player.local.site]===m&&s.player.local.x===x&&s.player.local.y===y)||(m.wildlife?.animals??[]).some(a=>a!==except&&a.x===x&&a.y===y)||(m.encounters?.actors??[]).some(a=>a!==except&&a.x===x&&a.y===y);}
+export function actorStep(s,m,a,target,flee=false){const valid=(x,y)=>!blocked(m,x,y)&&(a!==s.player.local||m.seen[`${x},${y}`])&&(!a.species||x>0&&y>0&&x<m.w-1&&y<m.h-1&&m.grid[y][x]==='.'&&!m.portals?.some(p=>p.x===x&&p.y===y));const dirs=[[1,0],[-1,0],[0,1],[0,-1]];if(flee)return dirs.map(([dx,dy])=>({x:a.x+dx,y:a.y+dy})).filter(p=>valid(p.x,p.y)&&!occupied(s,m,p.x,p.y,a)&&distance(p,target)>distance(a,target)).sort((a,b)=>distance(b,target)-distance(a,target))[0];const q=[{x:a.x,y:a.y,first:null}],seen=new Set([`${a.x},${a.y}`]);for(let i=0;i<q.length&&i<2000;i++){const p=q[i];if(distance(p,target)<=1)return p.first;for(const[dx,dy]of dirs){const x=p.x+dx,y=p.y+dy,k=`${x},${y}`;if(!seen.has(k)&&valid(x,y)&&!occupied(s,m,x,y,a)){seen.add(k);q.push({x,y,first:p.first??{x,y}});}}}return null;}
+export function combatLog(s,t,text){s.log.push({id:`${s.revision}-${s.log.length}`,time:t,text});s.log=s.log.slice(-120);}
+export function hitPlayer(s,damage,source,t=s.time){if(s.stats.health<=0)return 0;s.combat??={hits:0,guardUntil:0,noiseUntil:0};s.combat.hits++;const parts=Object.keys(BODY_PARTS),part=parts[Math.floor(randomAt(s.seed+':hit',s.combat.hits,0)*parts.length)],guard=s.combat.guardUntil>=t?1:0,actual=Math.max(0,protect(s,part,damage)-guard);if(actual>=2)inflictWound(s,actual,part);s.stats.health=Math.max(0,s.stats.health-actual);s.stats.spirit=Math.max(0,(s.stats.spirit??100)-actual*.5);applyDevLocks(s);s.ended=s.stats.health<=0;combatLog(s,t,`${source}攻击${BODY_PARTS[part]}：受到 ${actual} 伤害，防护抵消 ${damage-actual}。`);return actual;}
+export function validateCombat(s){const c=s.combat;if(c!==undefined&&(!c||!Number.isSafeInteger(c.hits)||c.hits<0||![c.guardUntil,c.noiseUntil].every(v=>Number.isSafeInteger(v)&&v>=0&&v<=s.time+5)))throw Error('战斗状态无效');}

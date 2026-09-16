@@ -1,3 +1,10 @@
+import {durableAction} from './src/durable.js';
+import {visibleNpcs} from './src/encounter-data.js';
+import {distance} from './src/combat-data.js';
+import {encounterAction} from './src/encounters.js';
+import {salvageAction} from './src/salvage.js';
+import {eventAction} from './src/events.js';
+import {trapAction} from './src/traps.js';
 import {medicalAction} from './src/medical.js';
 import {gardenAction} from './src/garden.js';
 import {cookMeal} from './src/cooking.js';
@@ -75,6 +82,12 @@ export function initialize(){
   async function act(type,p){
     await store.run(async(s,signal,transaction)=>{
       if(['devToggle','devGrant','devStats','devRestore','devClearWounds','devAdvance'].includes(type)){developerAction(s,type,p);return;}
+      if(['craftClothes','equipClothes','unequipClothes','repairDurable'].includes(type)){durableAction(s,type,p);return;}
+      if(type==='npcChat'){const a=visibleNpcs(s).find(a=>a.id===p.id);E.assert(!s.ended&&a?.hp>0&&!a.hostile&&distance(a,s.player.local)<=1,'请靠近可交流的人物');const message=E.text(p.message,600);E.assert(message,'请输入要说的话');const raw=s.mode==='demo'?{reply:'我也在寻找补给。留意周围的动静，有事就在这里说。'}:await validatedRequest('npc',{background:s.background,npc:{name:a.name,kind:a.kind,hp:a.hp,trust:a.trust},known:JSON.parse(E.knownContext(s)),message},r=>{E.assert(E.text(r?.reply,600),'对话不能为空');return r;},signal);E.tick(s,2,0);if(!s.ended)E.log(s,`${a.name}：${E.text(raw.reply,600)}`);return;}
+      if(['npcAttack','npcTalk','npcAid','npcTrade','npcLoot','guard','escape'].includes(type)){encounterAction(s,type,p);return;}
+      if(['dismantleItem','dismantle','packFurniture','deployFurniture'].includes(type)){salvageAction(s,type,p);return;}
+      if(type==='investigateEvent'){eventAction(s,p);return;}
+      if(['craftTrap','placeTrap','rearmTrap','retrieveTrap','checkTrap'].includes(type)){trapAction(s,type,p);return;}
       if(['medicalTreat','medicalCraft'].includes(type)){medicalAction(s,type,p);return;}
       if(['gardenSow','gardenWater','gardenHarvest','gardenClear'].includes(type)){gardenAction(s,type,p);return;}
       if(type==='cookMeal'){cookMeal(s,p.recipe,p.qty);return;}
@@ -106,7 +119,7 @@ export function initialize(){
         const c=E.cell(s);E.assert(c.site,'当前位置没有建筑');
         const raw=s.locals[c.site.id]?null:s.mode==='demo'?demoPlan(c.site.size??'normal'):await validatedRequest('local',{...payload,site:c.site,size:c.site.size??'normal',maxWidth:BUILDING_SIZES[c.site.size??'normal'],maxHeight:BUILDING_SIZES[c.site.size??'normal']},raw=>E.validateLocal(raw,c.site.size??'normal'),signal);E.enter(s,raw);
       }else if(type==='search'){
-        const c=E.localMap(s)?.containers[E.key(p.x,p.y)];E.assert(c&&!c.searched&&E.adjacent(s,p.x,p.y),'请站到尚未搜索的容器旁');
+        const c=E.localMap(s)?.containers[E.key(p.x,p.y)];E.assert(c&&!c.removed&&!c.searched&&E.adjacent(s,p.x,p.y),'请站到尚未搜索的容器旁');
         const raw=s.mode==='demo'?E.demoLoot(c.name):await validatedRequest('loot',{...payload,action:'搜索容器',container:{name:c.name,kind:c.kind},site:E.cell(s).site},E.validateLoot,signal);E.searchContainer(s,p.x,p.y,raw);
       }else if(type==='survey'){
         F.quickGather(s);
@@ -178,7 +191,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.23.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.24.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

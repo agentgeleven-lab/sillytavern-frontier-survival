@@ -1,5 +1,5 @@
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const names={world:'区域生成',field:'地块 / 洞穴生成',local:'建筑生成',loot:'容器搜索',build:'建设描述',sync:'聊天同步',models:'拉取模型',operation:'操作错误'};
+const names={npc:'NPC 交谈',world:'区域生成',field:'地块 / 洞穴生成',local:'建筑生成',loot:'容器搜索',build:'建设描述',sync:'聊天同步',models:'拉取模型',operation:'操作错误'};
 const states={requesting:'请求中',received:'已收到结果',validated:'校验通过',invalid:'校验失败',error:'操作失败',cancelled:'已取消',interrupted:'页面关闭前未完成'};
 const failed=r=>['invalid','error','cancelled','interrupted'].includes(r.status);
 const pre=value=>`<pre>${esc(typeof value==='string'?value:JSON.stringify(value,null,2))}</pre>`;

@@ -1,0 +1,7 @@
+import * as E from './engine.js';
+import {CLOTHES,DURABLE,worn} from './durable-data.js';
+import {hasFacility} from './shelter-data.js';
+export function durableAction(s,action,p){E.assert(!s.ended,'角色已无法行动');if(action==='craftClothes'){const d=CLOTHES[p.item];E.assert(d?.cost,'此衣物需要搜索或使用既有外套配方');E.assert(hasFacility(s,'bench'),'需要工作台');for(const[id,n]of Object.entries(d.cost))E.assert(s.bag[id]>=n,'材料不足');E.assert(E.weight(s.bag)-E.weight(d.cost)+d.weight<=20,'背包空间不足');for(const[id,n]of Object.entries(d.cost))s.bag[id]-=n;E.tick(s,30,0);if(!s.ended)s.bag[p.item]=(s.bag[p.item]??0)+1;return;}
+ if(action==='unequipClothes'){E.assert(Object.hasOwn(worn(s),p.slot),'该部位没有装备');s.wardrobe={...worn(s)};delete s.wardrobe[p.slot];if(s.thermal)s.thermal.coat=false;return;}
+ const d=DURABLE[p.item];E.assert(d&&s.bag[p.item]>0,'背包没有这件装备');if(action==='equipClothes'){E.assert(d.slot&&d.condition>0,'衣物已损坏或不是穿戴物');s.wardrobe={...worn(s),[d.slot]:p.item};if(s.thermal)s.thermal.coat=false;return;}
+ E.assert(action==='repairDurable'&&d.condition<10,'这件物品无需维修');E.assert(hasFacility(s,'bench'),'维修需要工作台');const cost=d.weapon?{wood:1,scrap:1}:{cloth:2};for(const[id,n]of Object.entries(cost))E.assert(s.bag[id]>=n,'维修材料不足');for(const[id,n]of Object.entries(cost))s.bag[id]-=n;E.tick(s,20,0);if(!s.ended){s.bag[p.item]--;s.bag[d.base]=(s.bag[d.base]??0)+1;if(s.equipment?.weapon===p.item)s.equipment.weapon=d.base;for(const slot of Object.keys(s.wardrobe??{}))if(s.wardrobe[slot]===p.item)s.wardrobe[slot]=d.base;E.log(s,`修复${CLOTHES[d.base]?.name??d.base}，耐久恢复完整。`);}}

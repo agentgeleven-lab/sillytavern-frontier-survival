@@ -1,3 +1,4 @@
+import {worn} from './durable-data.js';
 import * as E from './engine.js';
 import {campAt,canUseCampObject} from './camp-data.js';
 import {hasFacility} from './shelter-data.js';
@@ -7,7 +8,7 @@ import {coverAt} from './camp-rooms.js';
 import {tiles} from './camp-data.js';
 import {timeFrozen} from './developer-data.js';
 function spend(s,cost){for(const[id,q]of Object.entries(cost))E.assert((s.bag[id]??0)>=q,`缺少${E.ITEMS[id].name} ${q}`);for(const[id,q]of Object.entries(cost))s.bag[id]-=q;}
-export function workshopAction(s,action,p={}){E.assert(!s.ended,'角色已无法行动');if(action==='wearCoat'){E.assert((s.bag.warmcoat??0)>0,'背包没有保暖外套');s.thermal??={wet:0,cold:0,heat:0,coat:false};s.thermal.coat=!s.thermal.coat;return;}
+export function workshopAction(s,action,p={}){E.assert(!s.ended,'角色已无法行动');if(action==='wearCoat'){E.assert((s.bag.warmcoat??0)>0,'背包没有保暖外套');s.thermal??={wet:0,cold:0,heat:0,coat:false};const active=worn(s).torso==='warmcoat';if(s.wardrobe){if(active)delete s.wardrobe.torso;else s.wardrobe.torso='warmcoat';s.thermal.coat=false;}else s.thermal.coat=!s.thermal.coat;return;}
  if(action==='workshopCraft'){const r=WORKSHOP_RECIPES[p.recipe];E.assert(r,'未知加工配方');E.assert(usableBench(s,r.level),'请使用对应等级工作台');E.assert(!r.metal||hasFacility(s,'metalbench'),'还需要可使用的金属工作台');E.assert(E.weight(s.bag)-E.weight(r.cost)+E.weight(r.output)<=20,'背包空间不足');spend(s,r.cost);E.tick(s,r.minutes,0);if(!s.ended){for(const[id,q]of Object.entries(r.output))s.bag[id]=(s.bag[id]??0)+q;E.log(s,`完成${r.name}。`);}return;}
  E.assert(s.player.camp,'请进入营地');const l=campAt(s).layout,o=l.objects.find(a=>a.id===p.id);E.assert(o&&canUseCampObject(s,o),'请靠近该家具或切换简易模式');
  if(action==='upgradeBench'){E.assert(o.type==='bench'&&benchLevel(o)<3,'工作台已满级或类型不符');const next=benchLevel(o)+1;E.assert(p.level===next,'升级预览已变化');spend(s,UPGRADE_COSTS[next]);E.tick(s,60*next,0);if(!s.ended){o.workshopLevel=next;E.log(s,`工作台升级到 ${next} 级。`);}return;}

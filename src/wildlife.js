@@ -1,3 +1,4 @@
+import {npcMinute,animalThreatTurn} from './encounter-data.js';
 import {changeSpirit,visibleDanger} from './spirit.js';
 import {stealth} from './equipment-data.js';
 import {HARVEST,corpseAge,corpseFreshness} from './hunting-data.js';
@@ -25,7 +26,7 @@ export function speciesPool(s,m){
  return {forest:['rabbit','deer','boar','fox','wolf'],rainforest:['rat','boar'],grassland:['rabbit','deer','fox','wolf'],mountain:['rabbit','deer','wolf'],wetland:['rat','boar','fox'],coast:['rat','rabbit','fox'],desert:['rat','rabbit','fox'],tundra:['rabbit','deer','wolf']}[biome];
 }
 const day=t=>Math.floor((t-300)/1440);
-function reserve(s,t){
+export function reserve(s,t){
  s.world.ecology??=habitatFor(s.world.environment??{biome:'forest',climate:'温带',moisture:50,landUse:'wilderness'});
  const e=s.world.ecology;e.fauna??={version:1,day:day(t),serial:0,stock:Object.fromEntries(Object.keys(SPECIES).map(id=>[id,SPECIES[id].prey.length?4:12]))};
  const f=e.fauna,elapsed=Math.max(0,day(t)-f.day);
@@ -37,7 +38,7 @@ function spawn(s,m,t,species){
  const w=m.wildlife,f=reserve(s,t),live=w.animals.filter(a=>a.hp>0),pred=SPECIES[species].prey;
  if(live.length>=w.cap||f.stock[species]<1||pred.length&&(live.some(a=>SPECIES[a.species].prey.length)||live.filter(a=>pred.includes(a.species)).length<2))return false;
  const p=s.player.local?.site&&s.locals[s.player.local.site]===m?s.player.local:null,candidates=[];
- for(let y=1;y<m.h-1;y++)for(let x=1;x<m.w-1;x++)if((x===1||y===1||x===m.w-2||y===m.h-2)&&pass(m,x,y)&&!w.animals.some(a=>a.x===x&&a.y===y)&&(!p||dist(p,{x,y})>=4))candidates.push({x,y});
+ for(let y=1;y<m.h-1;y++)for(let x=1;x<m.w-1;x++)if((x===1||y===1||x===m.w-2||y===m.h-2)&&pass(m,x,y)&&!w.animals.some(a=>a.x===x&&a.y===y)&&!m.encounters?.actors.some(a=>a.x===x&&a.y===y)&&(!p||dist(p,{x,y})>=4))candidates.push({x,y});
  if(!candidates.length)return false;
  const pos=candidates[Math.floor(random(s,m,'spawn:'+f.serial,t)*candidates.length)];
  f.stock[species]--;const a={id:`${s.atlas.x},${s.atlas.y}:${++f.serial}`,species,...pos,hp:SPECIES[species].hp,stamina:100,hunger:55,credit:0,state:'wander',born:t,deadAt:null,meat:0,target:null};w.animals.push(a);track(m,a,t,'footprint');return true;
@@ -55,14 +56,15 @@ function nextStep(m,a,target,occupied){
  const queue=[{x:a.x,y:a.y,first:null}],seen=new Set([k(a.x,a.y)]);
  for(let i=0;i<queue.length&&i<1000;i++){const p=queue[i];if(dist(p,target)<=1)return p.first;for(const[dx,dy]of directions){const x=p.x+dx,y=p.y+dy,key=k(x,y);if(!seen.has(key)&&pass(m,x,y)&&!occupied(x,y)){seen.add(key);queue.push({x,y,first:p.first??{x,y}});}}}return null;
 }
-function minute(s,m,t,awake){
+function minute(s,m,t,awake,present=true){
+ npcMinute(s,m,t,present);const engaged=new Set((m.wildlife?.animals??[]).filter(a=>animalThreatTurn(s,m,a,t,present)).map(a=>a.id));
  const w=m.wildlife,p=awake&&s.player.local&&s.locals[s.player.local.site]===m?s.player.local:null;
  if(p&&visibleDanger({...s,time:t}))changeSpirit(s,-2/60);
  for(const a of w.animals)if(a.hp>0){a.hunger=clamp(a.hunger+.06);a.stamina=clamp(a.stamina+.4);}
  // Four shared slices allow fractional speeds without giving fast animals an uninterrupted turn.
  for(let slice=0;slice<4;slice++){
  const order=w.animals.slice();if((t+slice)%2)order.reverse();
- for(const a of order){if(a.hp<=0)continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&dist(a,p)<= (stealth(s)?1:def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??(a.fear&&a.fear.until>=t?a.fear:null)??playerThreat;
+ for(const a of order){if(a.hp<=0||engaged.has(a.id))continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&!['wolf','boar'].includes(a.species)&&dist(a,p)<= (stealth(s)?1:def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??(a.fear&&a.fear.until>=t?a.fear:null)??playerThreat;
  let goal=null,running=false;
  if(threat){a.state='flee';running=a.stamina>5;a.target=null;goal=threat;}
  else{
@@ -80,7 +82,7 @@ function minute(s,m,t,awake){
  a.credit=Math.min(4,a.credit+(running?def.run:def.speed)/4);if(a.credit<1)continue;a.credit--;
  if(goal&&a.state==='eat'&&dist(a,goal)<=1){goal.meat=Math.max(0,goal.meat-1);a.hunger=clamp(a.hunger-35);continue;}
  if(goal&&a.state==='hunt'&&dist(a,goal)<=1){goal.hp=Math.max(0,goal.hp-1);a.stamina=clamp(a.stamina-2);if(!goal.hp){killAnimal(m,goal,t);a.state='eat';}continue;}
- const occupied=(x,y)=>w.animals.some(b=>b.id!==a.id&&b.x===x&&b.y===y)||(s.player.local&&s.locals[s.player.local.site]===m&&s.player.local.x===x&&s.player.local.y===y);
+ const occupied=(x,y)=>(m.encounters?.actors??[]).some(n=>n.x===x&&n.y===y)||w.animals.some(b=>b.id!==a.id&&b.x===x&&b.y===y)||(s.player.local&&s.locals[s.player.local.site]===m&&s.player.local.x===x&&s.player.local.y===y);
  let step=null;
  if(a.state==='flee'){step=directions.map(([dx,dy])=>({x:a.x+dx,y:a.y+dy})).filter(q=>pass(m,q.x,q.y)&&!occupied(q.x,q.y)).sort((u,v)=>dist(v,goal)-dist(u,goal))[0];if(step&&dist(step,goal)<dist(a,goal))step=null;}
  else if(goal)step=nextStep(m,a,goal,occupied);
@@ -101,7 +103,7 @@ export function advanceWildlife(s,start,awake=true){
  ensureWildlife(s,m,start);const w=m.wildlife;
  // Away maps retain individuals. Simulate at most the last hour, and at most two arrivals.
  if(w.time<start){const elapsed=start-w.time;reserve(s,start);if(elapsed>=180){for(const a of w.animals)if(a.hp>0&&random(s,m,a.id+':depart',Math.floor(start/180))<Math.min(.65,elapsed/2880)){a.hp=0;a.deadAt=start-1440;w.departures++;}w.animals=w.animals.filter(a=>a.hp>0||start-a.deadAt<1440);}
- for(let t=Math.max(w.time,start-60)+1;t<=start;t++)minute(s,m,t,false);
+ for(let t=Math.max(w.time,start-60)+1;t<=start;t++)minute(s,m,t,false,false);
  for(let b=Math.max(w.check+1,Math.floor(start/180)-1);b<=Math.floor(start/180);b++)migration(s,m,b);
  w.time=start;w.check=Math.floor(start/180);
  }
@@ -126,7 +128,7 @@ export function validateWildlife(s){
  if(f){ok(f.version===1&&integer(f.day,-1,Math.floor(s.time/1440))&&integer(f.serial,0,1e9)&&f.stock&&Object.keys(f.stock).length===Object.keys(SPECIES).length);for(const id of Object.keys(SPECIES))ok(Number.isFinite(f.stock[id])&&f.stock[id]>=0&&f.stock[id]<=(SPECIES[id].prey.length?4:12));}
  const ids=new Set();
  for(const m of Object.values(s.locals)){const w=m.wildlife;if(!w)continue;ok(f&&['field','cave'].includes(m.kind)&&w.version===1&&w.cap==={small:4,normal:6,large:8}[m.size]&&integer(w.time,0,s.time)&&integer(w.check,0,Math.floor(w.time/180))&&w.check===Math.floor(w.time/180)&&integer(w.deaths,0,1e9)&&integer(w.departures,0,1e9)&&Array.isArray(w.animals)&&w.animals.length<=40&&w.animals.filter(a=>a.hp>0).length<=w.cap&&Array.isArray(w.tracks)&&w.tracks.length<=24&&Array.isArray(w.observations)&&w.observations.length<=16);
- const occupied=new Set();for(const a of w.animals){ok(typeof a.id==='string'&&a.id.length<100&&!ids.has(a.id)&&a.id.startsWith(`${s.atlas.x},${s.atlas.y}:`)&&integer(Number(a.id.split(':')[1]),1,f.serial)&&Object.hasOwn(SPECIES,a.species)&&speciesPool(s,m).includes(a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&pass(m,a.x,a.y)&&!occupied.has(k(a.x,a.y)));ids.add(a.id);occupied.add(k(a.x,a.y));ok(integer(a.hp,0,SPECIES[a.species].hp)&&Number.isFinite(a.stamina)&&a.stamina>=0&&a.stamina<=100&&Number.isFinite(a.hunger)&&a.hunger>=0&&a.hunger<=100&&Number.isFinite(a.credit)&&a.credit>=0&&a.credit<=4&&Object.hasOwn(BEHAVIORS,a.state)&&integer(a.born,0,w.time)&&integer(a.meat,0,3));ok(a.hp===0?a.state==='dead'&&integer(a.deadAt,a.born,w.time):a.deadAt===null&&a.state!=='dead');if(a.hide!==undefined)ok(integer(a.hide,0,HARVEST[a.species].hide));if(a.examinedAt!==undefined)ok(integer(a.examinedAt,0,s.time));if(a.fear)ok(integer(a.fear.x,0,m.w-1)&&integer(a.fear.y,0,m.h-1)&&integer(a.fear.until,0,w.time+5));if(a.target)ok(typeof a.target.id==='string'&&a.target.id.length<100&&integer(a.target.x,1,m.w-2)&&integer(a.target.y,1,m.h-2)&&integer(a.target.until,0,w.time+6));}
+ const occupied=new Set();for(const a of w.animals){ok(typeof a.id==='string'&&a.id.length<100&&!ids.has(a.id)&&a.id.startsWith(`${s.atlas.x},${s.atlas.y}:`)&&integer(Number(a.id.split(':')[1]),1,f.serial)&&Object.hasOwn(SPECIES,a.species)&&speciesPool(s,m).includes(a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&pass(m,a.x,a.y)&&!occupied.has(k(a.x,a.y)));ids.add(a.id);occupied.add(k(a.x,a.y));ok(integer(a.hp,0,SPECIES[a.species].hp)&&Number.isFinite(a.stamina)&&a.stamina>=0&&a.stamina<=100&&Number.isFinite(a.hunger)&&a.hunger>=0&&a.hunger<=100&&Number.isFinite(a.credit)&&a.credit>=0&&a.credit<=4&&Object.hasOwn(BEHAVIORS,a.state)&&integer(a.born,0,w.time)&&integer(a.meat,0,3));ok(a.hp===0?a.state==='dead'&&integer(a.deadAt,a.born,w.time):a.deadAt===null&&a.state!=='dead');if(a.hide!==undefined)ok(integer(a.hide,0,HARVEST[a.species].hide));if(a.attackAt!==undefined)ok(integer(a.attackAt,0,s.time));if(a.examinedAt!==undefined)ok(integer(a.examinedAt,0,s.time));if(a.fear)ok(integer(a.fear.x,0,m.w-1)&&integer(a.fear.y,0,m.h-1)&&integer(a.fear.until,0,w.time+5));if(a.target)ok(typeof a.target.id==='string'&&a.target.id.length<100&&integer(a.target.x,1,m.w-2)&&integer(a.target.y,1,m.h-2)&&integer(a.target.until,0,w.time+6));}
  for(const a of [...w.tracks,...w.observations])ok(Object.hasOwn(SPECIES,a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&integer(a.time,0,s.time));for(const o of w.observations)ok(typeof o.id==='string'&&o.id.length<100&&Object.hasOwn(BEHAVIORS,o.state));for(const tr of w.tracks)ok(['footprint','remains'].includes(tr.type));
  }
 }

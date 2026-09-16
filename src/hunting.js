@@ -1,3 +1,5 @@
+import {DURABLE,wearItem} from './durable-data.js';
+import {hitPlayer} from './combat-data.js';
 import {BODY_PARTS} from './body-data.js';
 import {applyDevLocks,timeFrozen} from './developer-data.js';
 import {gainFood,consumeFood,FOOD_LIFE} from './provisions.js';
@@ -9,6 +11,7 @@ import {SPECIES,killAnimal} from './wildlife.js';
 import {randomAt} from './environment.js';
 import {fireRemaining} from './lighting-data.js';
 import {RETALIATION,SCARE_CHANCE,HUNT_ACTIONS,corpseAge,corpseFreshness} from './hunting-data.js';
+function wearCutting(s){const id=Object.keys(s.bag).find(id=>s.bag[id]>0&&DURABLE[id]?.condition>0&&['tool','stoneknife'].includes(DURABLE[id].base));wearItem(s,id);}
 export function selectedAnimal(s,id){const m=E.localMap(s),a=m?.wildlife?.animals.find(a=>a.id===id);E.assert(a&&E.canSee(s,a.x,a.y),'目标已不在当前视野内，请重新选择');return {m,a,distance:Math.abs(s.player.local.x-a.x)+Math.abs(s.player.local.y-a.y)};}
 export function cookingReady(s){const m=E.localMap(s),f=m?.fire,p=s.player.local;return !!(f&&p&&Math.abs(p.x-f.x)+Math.abs(p.y-f.y)<=1&&f.lit&&fireRemaining(s,f)>=(timeFrozen(s)?1:10));}
 function enoughWeight(s,id){E.assert(E.weight(s.bag)+E.ITEMS[id].weight<=20,'背包空间不足，请先存放物品');}
@@ -21,7 +24,7 @@ export function huntingAction(s,action,id){
   E.assert((s.bag[source]??0)>0,`缺少${E.ITEMS[source].name}`);
   E.assert(cook?cookingReady(s):cuttingTool(s),cook?'请靠近燃烧中的营火，燃料需至少 10 分钟':'加工皮料需要工具');
   E.assert(E.weight(s.bag)-E.ITEMS[source].weight+E.ITEMS[result].weight<=20,'背包空间不足');
-  let life;if(cook)life=consumeFood(s,s.bag,source,1,timeFrozen(s)?0:rule.minutes);else s.bag[source]--;E.tick(s,rule.minutes,0);if(!s.ended){gainFood(s,s.bag,result,1,cook?FOOD_LIFE.cookedmeat*(life-(timeFrozen(s)?0:rule.minutes))/FOOD_LIFE.rawmeat:undefined);E.log(s,cook?'烤熟一份生肉，可食用恢复 30 饱食。':'加工一份皮料，得到一份布料。');}else E.log(s,'加工中健康耗尽，材料已消耗，未获得成品。');return;
+  let life;if(cook)life=consumeFood(s,s.bag,source,1,timeFrozen(s)?0:rule.minutes);else s.bag[source]--;E.tick(s,rule.minutes,0);if(!s.ended){if(!cook)wearCutting(s);gainFood(s,s.bag,result,1,cook?FOOD_LIFE.cookedmeat*(life-(timeFrozen(s)?0:rule.minutes))/FOOD_LIFE.rawmeat:undefined);E.log(s,cook?'烤熟一份生肉，可食用恢复 30 饱食。':'加工一份皮料，得到一份布料。');}else E.log(s,'加工中健康耗尽，材料已消耗，未获得成品。');return;
  }
  const {m,a,distance}=selectedAnimal(s,id),name=SPECIES[a.species].name,w=weapon(s);
  const shooting=action==='shootAnimal';
@@ -43,7 +46,7 @@ export function huntingAction(s,action,id){
   const counter=a.hp>0&&distance<=1&&(attack?roll<.5:!success)?RETALIATION[a.species]:0;
   E.log(s,attack?`${w.name}攻击${name}，${success?`造成 ${damage} 点伤害${a.hp?'。':'，动物死亡。'}`:'未命中，箭矢已消耗。'}`:`驱赶${name}${success?'成功，动物尝试逃离。':'失败，未能持续驱离动物。'}`);
   E.tick(s,rule.minutes,0);
-  if(counter){const hitPart=inflictWound(s,counter);changeSpirit(s,-counter*.5);s.stats.health=Math.max(0,s.stats.health-counter);s.ended=s.stats.health<=0;applyDevLocks(s);E.log(s,`${name}在接触中反击${hitPart?`，伤及${BODY_PARTS[hitPart]}`:''}，损失 ${counter} 点健康、${counter*.5} 点精神${s.ended?'，角色已无法行动':''}。`);}return;
+  if(attack&&w.item)wearItem(s,w.item);if(counter)hitPlayer(s,counter,name);return;
  }
  E.assert(a.hp===0,'只能处理动物尸体');
  if(action==='clearAnimal'){s.stats.stamina-=rule.stamina;m.wildlife.animals=m.wildlife.animals.filter(b=>b.id!==id);E.tick(s,rule.minutes,0);E.log(s,`清理${name}遗骸，未取出的物资一并丢弃。`);return;}
@@ -52,5 +55,5 @@ export function huntingAction(s,action,id){
  E.assert((a[resource]??0)>0,'这部分资源已经耗尽');E.assert(corpseAge(s,a)+(timeFrozen(s)?0:rule.minutes)<(meat?720:1440),meat?'尸体即将或已经腐败，不能割取可用生肉':'尸体即将腐解，来不及剥皮');enoughWeight(s,item);
  // Reserve only this portion; predators may consume the rest during the work.
  a[resource]--;s.stats.stamina-=rule.stamina;E.tick(s,rule.minutes,0);
- if(!s.ended){gainFood(s,s.bag,item,1,meat?Math.max(1,720-corpseAge(s,a)):undefined);E.log(s,`从${name}遗骸取得${E.ITEMS[item].name} ×1。`);}else E.log(s,'处理中健康耗尽，未取得预留的材料。');
+ if(!s.ended){wearCutting(s);gainFood(s,s.bag,item,1,meat?Math.max(1,720-corpseAge(s,a)):undefined);E.log(s,`从${name}遗骸取得${E.ITEMS[item].name} ×1。`);}else E.log(s,'处理中健康耗尽，未取得预留的材料。');
 }
