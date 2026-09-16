@@ -1,12 +1,13 @@
+import {applyDevLocks} from './developer-data.js';
 export const injuryState=s=>s.injuries??{trauma:0,bleeding:0,infection:0,exposure:0};
-export function inflictWound(s,damage){if(damage<2)return;const w=s.injuries??={...injuryState(s)};w.trauma=Math.min(100,w.trauma+damage*2);w.bleeding=Math.min(3,w.bleeding+(damage>=6?2:1));}
+export function inflictWound(s,damage){if(damage<2)return;const w=s.injuries??={...injuryState(s)};w.trauma=Math.min(100,w.trauma+damage*2);w.bleeding=Math.min(3,w.bleeding+(damage>=6?2:1));applyDevLocks(s);}
 export const injuryEffort=s=>1+injuryState(s).trauma/100;
 export const injuryDelay=s=>injuryState(s).trauma>=30?1:0;
 export function advanceInjuries(s,minutes){
  if(!s.injuries)return;const w=s.injuries;
  for(let i=0;i<minutes&&s.stats.health>0;i++){
   if(w.bleeding>0){w.exposure++;if(w.exposure>=360){w.exposure=0;w.infection=Math.min(3,w.infection+1);}}
-  s.stats.health=Math.max(0,s.stats.health-w.bleeding*.01-w.infection*.005);
+  s.stats.health=Math.max(0,s.stats.health-w.bleeding*.01-w.infection*.005);applyDevLocks(s);
  }
 }
 export function healWounds(s,minutes,bed=false){if(!s.injuries)return;const w=s.injuries;if(!w.bleeding&&!w.infection&&s.stats.food>20&&s.stats.water>20)w.trauma=Math.max(0,w.trauma-minutes/60*(bed?4:2));}

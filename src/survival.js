@@ -1,3 +1,4 @@
+import {timeFrozen} from './developer-data.js';
 import * as E from './engine.js';
 import {FACILITIES,currentCamp,hasFacility} from './shelter-data.js';
 import {settleFood,consumeFood,gainFood,FOOD_LIFE,discardSpoiled,freshQty,foodBatches} from './provisions.js';
@@ -11,8 +12,8 @@ export function survivalAction(s,action,item){
   settleFood(s,camp.storage);camp.facilities??={};camp.facilities[item]=true;camp.provisions.rate=camp.facilities.cellar?.25:1;E.log(s,`建成${r.name}：${r.description}`);return;
  }
  if(action==='campCook'||action==='smokeMeat'){
-  const smoke=action==='smokeMeat',minutes=smoke?120:15,wood=smoke?2:1,id=smoke?'smokedmeat':'cookedmeat';E.assert(hasFacility(s,'stove')&&(!smoke||hasFacility(s,'smoker')),'请在建有对应设施的营地加工');E.assert((s.bag.wood??0)>=wood,'木材不足');E.assert(freshQty(s,'rawmeat',s.bag,minutes)>0,'没有足够新鲜的生肉');E.assert(E.weight(s.bag)-E.ITEMS.rawmeat.weight-wood+E.ITEMS[id].weight<=20,'背包空间不足');
-  const life=consumeFood(s,s.bag,'rawmeat',1,minutes);s.bag.wood-=wood;E.tick(s,minutes,0);if(!s.ended){gainFood(s,s.bag,id,1,FOOD_LIFE[id]*(life-minutes)/FOOD_LIFE.rawmeat);E.log(s,smoke?'完成一份熏肉，保存期限继承原料的新鲜比例。':'完成一份熟肉，保存期限继承原料的新鲜比例。');}return;
+  const smoke=action==='smokeMeat',minutes=smoke?120:15,wood=smoke?2:1,id=smoke?'smokedmeat':'cookedmeat';E.assert(hasFacility(s,'stove')&&(!smoke||hasFacility(s,'smoker')),'请在建有对应设施的营地加工');E.assert((s.bag.wood??0)>=wood,'木材不足');E.assert(freshQty(s,'rawmeat',s.bag,timeFrozen(s)?0:minutes)>0,'没有足够新鲜的生肉');E.assert(E.weight(s.bag)-E.ITEMS.rawmeat.weight-wood+E.ITEMS[id].weight<=20,'背包空间不足');
+  const life=consumeFood(s,s.bag,'rawmeat',1,timeFrozen(s)?0:minutes);s.bag.wood-=wood;E.tick(s,minutes,0);if(!s.ended){gainFood(s,s.bag,id,1,FOOD_LIFE[id]*(life-(timeFrozen(s)?0:minutes))/FOOD_LIFE.rawmeat);E.log(s,smoke?'完成一份熏肉，保存期限继承原料的新鲜比例。':'完成一份熟肉，保存期限继承原料的新鲜比例。');}return;
  }
  if(action==='discardFood'){E.assert(item==='bag'||item==='camp'&&camp,'请选择背包或当前营地');const bag=item==='camp'?camp.storage:s.bag;E.assert(foodBatches(s,bag).some(b=>!b.life),'没有腐败食物');const n=discardSpoiled(s,bag);E.log(s,`丢弃 ${n} 份腐败食物。`);return;}
  const w=injuryState(s);E.assert(['bandage','treatInfection'].includes(action),'未知生存操作');

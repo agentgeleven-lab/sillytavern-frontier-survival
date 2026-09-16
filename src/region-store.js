@@ -1,3 +1,4 @@
+import {applyDevLocks,validateDeveloper} from './developer-data.js';
 import {prepareFood} from './provisions.js';
 import {assert,clone,validateSave,refreshSight} from './engine.js';
 import {regionKey,regionData,summarizeRegion,ensureGates} from './world.js';
@@ -56,7 +57,7 @@ export class RegionGameStore {
       if(draft)prepareFood(draft);
       const value=await fn(draft,controller.signal,{loadRegion:(s,x,y)=>this.repository.loadRegion(k,s.id,`${x},${y}`),stageRegion:(coord,data)=>staged.set(coord,clone(data))});
       assert(epoch===this.epoch&&!controller.signal.aborted,'聊天或游戏已切换，旧结果已丢弃');
-      const next=value??draft;validateSave(next);prepareFood(next);refreshSight(next);ensureGates(next);summarizeRegion(next);next.revision++;staged.set(regionKey(next),regionData(next));
+      const next=value??draft;validateDeveloper(next);applyDevLocks(next);validateSave(next);prepareFood(next);refreshSight(next);ensureGates(next);summarizeRegion(next);next.revision++;staged.set(regionKey(next),regionData(next));
       await this.repository.commit(k,baseline,next,staged,{signal:controller.signal,replace:create});
       // A switch during the database commit must not install the old chat into the current UI.
       if(epoch===this.epoch){this.state=next;this.baseline=revision(next);this.notify();}return next;

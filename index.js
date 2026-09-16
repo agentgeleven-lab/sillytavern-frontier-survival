@@ -1,3 +1,4 @@
+import {developerAction} from './src/developer.js';
 import {survivalAction} from './src/survival.js';
 import {equipmentAction} from './src/equipment.js';
 import {huntingAction} from './src/hunting.js';
@@ -66,6 +67,7 @@ export function initialize(){
   }
   async function act(type,p){
     await store.run(async(s,signal,transaction)=>{
+      if(['devToggle','devGrant','devStats','devRestore','devClearWounds','devAdvance'].includes(type)){developerAction(s,type,p);return;}
       E.assert(!s.ended,'本局角色已无法行动，请导出记录并开始新游戏');
       const payload={background:s.background,theme:s.theme,seed:s.seed,known:JSON.parse(E.knownContext(s))};
       if(['craftLight','lightOn','lightOff','reloadLight','faceLight','fireBuild','fireFeed','fireToggle'].includes(type))lightingAction(s,type,p.item);
@@ -162,7 +164,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.12.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.13.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

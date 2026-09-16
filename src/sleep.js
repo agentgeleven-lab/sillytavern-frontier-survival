@@ -1,3 +1,4 @@
+import {timeFrozen,applyDevLocks} from './developer-data.js';
 import {hasFacility} from './shelter-data.js';
 import {healWounds,injuryState} from './injury-data.js';
 import {changeSpirit,spiritValue} from './spirit.js';
@@ -6,7 +7,7 @@ import {SLEEP_PLACES,SLEEP_LIMIT,WAKE_THRESHOLD,sleepPlace,sleepMinutes} from '.
 import {lightState,lightWarning,fireRemaining} from './lighting-data.js';
 export const WAKE_REASONS={complete:'按计划醒来',needs:'饥渴过低，提前醒来补给',health:'健康耗尽，无法继续睡眠'};
 function check(s,choice,turnOff){
-  E.assert(!s.ended&&s.stats.health>0,'角色已无法行动');
+  E.assert(!s.ended&&s.stats.health>0,'角色已无法行动');E.assert(!timeFrozen(s),'时间已冻结，请先在开发者模式解除冻结再睡眠');
   const minutes=sleepMinutes(s,choice);
   E.assert(minutes>0&&minutes<=SLEEP_LIMIT,'每次最多睡 12 小时；距离清晨过久时，请选择固定时长');
   E.assert(typeof turnOff==='boolean','照明选项无效');
@@ -25,7 +26,7 @@ function settle(s,minutes,turnOff){
     changeSpirit(s,((['building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
     s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1));
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
-    healWounds(s,1,hasFacility(s,'bed'));
+    healWounds(s,1,hasFacility(s,'bed'));applyDevLocks(s);
     if(s.stats.food<=WAKE_THRESHOLD||s.stats.water<=WAKE_THRESHOLD){reason='needs';break;}
   }
   return {start,end:s.time,requested:minutes,place,reason,before,beforeWounds,afterWounds:{...injuryState(s)},after:{...s.stats},rainMinutes};

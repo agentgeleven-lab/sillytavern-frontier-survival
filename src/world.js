@@ -1,3 +1,4 @@
+import {timeFrozen} from './developer-data.js';
 import {environmentAt,habitatFor,noise,NATURAL_POINTS,BIOMES,LAND_USE} from './environment.js';
 import {stepMinutes,assert,key,hash,seeded,validateWorld,cell,flood,pathfind,tick,reveal,log,clone,validateSave} from './engine.js';
 import {REGION_SIZES} from './layout.js';
@@ -65,7 +66,7 @@ export function travelPlan(s,x,y){
   assert(side,'每次只能前往上下左右相邻区域');ensureGates(s);
   const exit=s.world.gates[side];assert(exit,'旧区域这一侧没有可达出口，请从其他方向探索');
   const path=pathfind(s.player,exit,(a,b)=>cell(s,a,b)&&cell(s,a,b).terrain!=='w');assert(path,'无法抵达区域出口');
-  const minutes=30+path.reduce((n,p)=>n+stepMinutes(s,p.x,p.y,false),0);
+  const minutes=timeFrozen(s)?0:30+path.reduce((n,p)=>n+stepMinutes(s,p.x,p.y,false),0);
   return {side,path,minutes};
 }
 export function installRegion(s,x,y,data,plan){
