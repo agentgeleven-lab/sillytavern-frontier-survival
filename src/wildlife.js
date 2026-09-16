@@ -43,7 +43,7 @@ function spawn(s,m,t,species){
  f.stock[species]--;const a={id:`${s.atlas.x},${s.atlas.y}:${++f.serial}`,species,...pos,hp:SPECIES[species].hp,stamina:100,hunger:55,credit:0,state:'wander',born:t,deadAt:null,meat:0,target:null};w.animals.push(a);track(m,a,t,'footprint');return true;
 }
 export function ensureWildlife(s,m,t=s.time){
- if(!m?.kind||!m.owner||m.wildlife)return;
+ if(m?.shore||!m?.kind||!m.owner||m.wildlife)return;
  reserve(s,t);m.wildlife={version:1,time:t,check:Math.floor(t/180),cap:{small:4,normal:6,large:8}[m.size],animals:[],tracks:[],observations:[],deaths:0,departures:0};
  const pool=speciesPool(s,m),herb=pool.filter(id=>!SPECIES[id].prey.length);
  for(let i=0;i<3;i++)spawn(s,m,t,herb[Math.floor(random(s,m,'initial:'+i,t)*herb.length)]);
@@ -97,7 +97,7 @@ function migration(s,m,bucket){
  if(random(s,m,'migration',bucket)<.55&&active(id,t))spawn(s,m,t,id);
 }
 export function advanceWildlife(s,start,awake=true){
- const m=s.player.local?s.locals[s.player.local.site]:null;if(!m?.kind||!m.owner)return;
+ const m=s.player.local?s.locals[s.player.local.site]:null;if(m?.shore||!m?.kind||!m.owner)return;
  ensureWildlife(s,m,start);const w=m.wildlife;
  // Away maps retain individuals. Simulate at most the last hour, and at most two arrivals.
  if(w.time<start){const elapsed=start-w.time;reserve(s,start);if(elapsed>=180){for(const a of w.animals)if(a.hp>0&&random(s,m,a.id+':depart',Math.floor(start/180))<Math.min(.65,elapsed/2880)){a.hp=0;a.deadAt=start-1440;w.departures++;}w.animals=w.animals.filter(a=>a.hp>0||start-a.deadAt<1440);}

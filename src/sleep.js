@@ -1,3 +1,4 @@
+import {waterRecovery,stomachLevel} from './water-data.js';
 import {sleepBenefit,recoveryBonus} from './positive-states.js';
 import {campBed} from './camp-rooms.js';
 import {timeFrozen,applyDevLocks} from './developer-data.js';
@@ -23,10 +24,10 @@ function settle(s,minutes,turnOff){
   for(let i=0;i<minutes;i++){
     const rain=place==='outdoor'&&s.weather==='小雨';if(rain)rainMinutes++;
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
-    const bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false);
+    const recovery=waterRecovery(s),bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false);
     if(s.ended){reason='health';break;}
     changeSpirit(s,((['covered','building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
-    s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1)+bonus);
+    s.stats.stamina=Math.min(100,s.stats.stamina+((rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1)+bonus)*recovery);
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
     healWounds(s,1,hasFacility(s,'bed'));applyDevLocks(s);
     if(s.stats.food<=WAKE_THRESHOLD||s.stats.water<=WAKE_THRESHOLD){reason='needs';break;}
@@ -37,6 +38,7 @@ function settle(s,minutes,turnOff){
 export function sleepPreview(s,choice='8h',turnOff=true){
   try{
     const minutes=check(s,choice,turnOff),draft=E.clone(s),report=settle(draft,minutes,turnOff),warnings=[];
+    if(stomachLevel(s))warnings.push('肠胃不适：水分消耗加快、体力恢复降低；重度会持续损失健康');
     if(report.gainedRested)warnings.push('醒来将获得充分休息：6 小时内普通行动基础体力消耗降低 10%');
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);
     if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);

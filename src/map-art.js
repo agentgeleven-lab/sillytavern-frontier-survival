@@ -1,3 +1,4 @@
+import {waterDepth} from './water-data.js';
 import {knownWildlife,SPECIES} from './wildlife.js';
 import {TERRAINS,key,cell,localMap,canSee,regionVisible,phaseAt} from './engine.js';
 import {artificialLight} from './daylight.js';
@@ -47,6 +48,7 @@ function indoor(g,map,x,y){const t=map.grid[y][x];g.fillStyle=t==='_'?'#d1d0bb':
   const c=map.containers[key(x,y)];if(c){g.fillStyle='#4d503d44';g.fillRect(.19,.24,.74,.68);g.fillStyle=c.searched?'#968565':'#9f7850';g.fillRect(.12,.12,.72,.7);g.strokeStyle='#dcc095';g.strokeRect(.16,.16,.64,.62);if(/箱/.test(c.kind)){path(g,[[.2,.23],[.76,.71]],null,'#d7b788');path(g,[[.76,.23],[.2,.71]],null,'#d7b788');}else{for(const i of [.35,.58]){g.beginPath();g.moveTo(.16,i);g.lineTo(.79,i);g.stroke();g.fillStyle='#e3cc97';g.fillRect(.4,i+.07,.17,.028);}}}
 }
 function outdoor(g,s,map,x,y){
+  if(map.shore){const t=map.grid[y][x];terrain(g,x>=5?'w':'s',x,y,s.seed);if(x>=5&&waterDepth(s,cell(s,map.shore.x,map.shore.y))==='deep'){g.fillStyle='#193f6866';g.fillRect(0,0,1,1);}if(t==='E'){g.fillStyle='#e8d6a4';g.fillRect(.15,.15,.7,.7);}if(x===4&&y===5)pointArt(g,'spring');else if(t==='#'&&x<5)rock(g,.5,.5,1.6);return;}
   const c=cell(s),t=map.grid[y][x],cave=map.kind==='cave';
   // Ground and obstacles have separate visual roles: walkable forest is a clearing, not a tree icon.
   terrain(g,cave?'u':['f','m'].includes(c.terrain)?'.':c.terrain,x,y,s.seed);
@@ -65,7 +67,7 @@ export function paintMap(canvas,s,{pan,selection,mapLevel}){
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     g.save();g.translate(ox+x*unit,oy+y*unit);g.scale(unit,unit);g.beginPath();g.rect(0,0,1,1);g.clip();const c=map?null:cell(s,x,y),known=map?map.seen[key(x,y)]:c.known;
     if(!known)fog(g,x,y,s.seed);else if(map){if(map.kind)outdoor(g,s,map,x,y);else indoor(g,map,x,y);if(!canSee(s,x,y)){g.fillStyle='#26364c99';g.fillRect(0,0,1,1);}}
-    else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);if(!regionVisible(s,x,y)){g.fillStyle='#26364c77';g.fillRect(0,0,1,1);}}
+    else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.terrain==='w'&&waterDepth(s,c)==='deep'){g.fillStyle='#193f6866';g.fillRect(0,0,1,1);}if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);if(!regionVisible(s,x,y)){g.fillStyle='#26364c77';g.fillRect(0,0,1,1);}}
     if(known&&(map?canSee(s,x,y):regionVisible(s,x,y))&&phaseAt(s.time).local<=4){g.fillStyle=phaseAt(s.time).local===2?'#24345944':'#bb885322';g.fillRect(0,0,1,1);}
     if(map&&known&&canSee(s,x,y)&&artificialLight(s,map,s.player.local,x,y)){g.fillStyle='#efbf6330';g.fillRect(0,0,1,1);}
     g.strokeStyle='#59694d12';g.lineWidth=.008;g.strokeRect(0,0,1,1);
