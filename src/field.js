@@ -1,3 +1,4 @@
+import {gainFood} from './provisions.js';
 import * as E from './engine.js';
 import {RESOURCES,initialResources,fieldConstraints,validateFieldMetadata} from './field-data.js';
 export {RESOURCES,parcelSpec,fieldConstraints} from './field-data.js';
@@ -34,7 +35,7 @@ function collect(s,entries,minutes){
   const items={};for(const[n,q]of entries){E.assert(n.remaining>=q&&q>0,'资源已耗尽');const item=RESOURCES[n.kind].item;items[item]=(items[item]??0)+q;}
   E.assert(E.weight(s.bag)+E.weight(items)<=20,'背包空间不足，请先存放物品');
   for(const[n,q]of entries)n.remaining-=q;
-  for(const[id,q]of Object.entries(items))s.bag[id]=(s.bag[id]??0)+q;
+  for(const[id,q]of Object.entries(items))gainFood(s,s.bag,id,q,id==='food'?2880:undefined);
   const c=E.cell(s);c.surveyed=true;c.depleted=Object.values(c.resources.nodes).filter(n=>n.zone==='field').every(n=>n.remaining===0);
   E.tick(s,minutes);E.log(s,`收集${Object.entries(items).map(([id,q])=>`${E.ITEMS[id].name} ×${q}`).join('、')}。`);
 }

@@ -74,5 +74,5 @@ test('storage failure and cancelled generation do not apply travel or overwrite 
 });
 test('region storage migration preserves legacy original and cross-window writes fail closed',async()=>{
   const mem=memory(),repo=new MemoryRepository(),a=new RegionGameStore(mem,'u',repo);const legacy=game('small');legacy.version=1;delete legacy.atlas;const original=JSON.stringify(legacy);mem.setItem(a.key(),original);await a.switch('standalone');assert.equal(mem.getItem(a.key()),original);
-  const b=new RegionGameStore(mem,'u',repo);await b.switch('standalone');await a.run(s=>{s.bag.water++;});await assert.rejects(b.run(s=>{s.bag.food++;}),/stale/);assert.equal((await repo.load(a.key())).bag.water,3);
+  const b=new RegionGameStore(mem,'u',repo);await b.switch('standalone');await a.run(s=>{s.bag.water++;});await assert.rejects(b.run(s=>{s.bag.water++;}),/stale/);assert.equal((await repo.load(a.key())).bag.water,3);
 });

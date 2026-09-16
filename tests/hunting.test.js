@@ -1,3 +1,4 @@
+import {gainFood} from '../src/provisions.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as E from '../src/engine.js';
@@ -21,7 +22,7 @@ test('scaring validates distance and stamina, success persists a bounded flee im
  const {s,a}=game();while(randomAt(`${s.seed}:${a.id}:scareAnimal`,s.time,s.revision)>=.95)s.revision++;act(s,'scareAnimal',a.id);assert.equal(s.stats.stamina,97);assert(a.fear.until>=s.time);assert.equal(a.state,'flee');E.validateSave(s);const snapshot=E.clone(s);s.stats.stamina=0;assert.throws(()=>act(s,'scareAnimal',a.id),/体力/);s.stats.stamina=snapshot.stats.stamina;assert.deepEqual(s,snapshot);
 });
 test('target ID, visibility and range are checked before consuming any resources',()=>{
- const {s,a}=game(),before=E.clone(s);assert.throws(()=>act(s,'attackAnimal','missing'),/视野/);assert.deepEqual(s,before);a.x=9;a.y=9;const far=E.clone(s);assert.throws(()=>act(s,'attackAnimal',a.id));assert.deepEqual(s,far);s.bag.rawmeat=1;assert.throws(()=>E.useItem(s,'rawmeat'),/可用/);
+ const {s,a}=game(),before=E.clone(s);assert.throws(()=>act(s,'attackAnimal','missing'),/视野/);assert.deepEqual(s,before);a.x=9;a.y=9;const far=E.clone(s);assert.throws(()=>act(s,'attackAnimal',a.id));assert.deepEqual(s,far);gainFood(s,s.bag,'rawmeat',1);assert.throws(()=>E.useItem(s,'rawmeat'),/可用/);
 });
 test('butchery rejects full bags, no tools, exhausted resources and impending decay atomically',()=>{
  const {s,a}=corpse();act(s,'inspectAnimal',a.id);s.bag={wood:20,tool:1};let before=E.clone(s);assert.throws(()=>act(s,'butcherAnimal',a.id),/空间/);assert.deepEqual(s,before);s.bag={};before=E.clone(s);assert.throws(()=>act(s,'skinAnimal',a.id),/工具/);assert.deepEqual(s,before);s.bag={tool:1};s.time=a.deadAt+716;before=E.clone(s);assert.throws(()=>act(s,'butcherAnimal',a.id),/腐败/);assert.deepEqual(s,before);
@@ -33,7 +34,7 @@ test('old corpses retain meat but cannot mint hide; clear removes remaining reso
  const {s,m,a}=corpse();delete a.hide;a.meat=2;E.validateSave(s);act(s,'inspectAnimal',a.id);assert.throws(()=>act(s,'skinAnimal',a.id),/耗尽/);const before=E.clone(s.bag),time=s.time;act(s,'clearAnimal',a.id);assert.equal(s.time,time+3);assert(!m.wildlife.animals.some(b=>b.id===a.id));assert.deepEqual(s.bag,before);assert.throws(()=>act(s,'clearAnimal',a.id),/视野/);E.validateSave(s);
 });
 test('cooking requires proximity and ten minutes of fuel; processing only uses owned materials',()=>{
- const {s,m}=game();s.bag.rawmeat=1;assert.equal(cookingReady(s),false);const before=E.clone(s);assert.throws(()=>act(s,'cookMeat'),/营火/);assert.deepEqual(s,before);lightingAction(s,'fireBuild');m.fire.remaining=9;assert.throws(()=>act(s,'cookMeat'),/燃料/);m.fire.remaining=10;act(s,'cookMeat');assert.equal(fireRemaining(s,m.fire),0);assert.equal(s.bag.cookedmeat,1);assert.throws(()=>act(s,'processHide'),/皮料/);
+ const {s,m}=game();gainFood(s,s.bag,'rawmeat',1);assert.equal(cookingReady(s),false);const before=E.clone(s);assert.throws(()=>act(s,'cookMeat'),/营火/);assert.deepEqual(s,before);lightingAction(s,'fireBuild');m.fire.remaining=9;assert.throws(()=>act(s,'cookMeat'),/燃料/);m.fire.remaining=10;act(s,'cookMeat');assert.equal(fireRemaining(s,m.fire),0);assert.equal(s.bag.cookedmeat,1);assert.throws(()=>act(s,'processHide'),/皮料/);
 });
 test('inspection, corpse portions and fear survive serialization; hidden state is not exposed',()=>{
  const {s,a}=corpse();act(s,'inspectAnimal',a.id);act(s,'butcherAnimal',a.id);const read=E.validateSave(JSON.parse(JSON.stringify(s)));assert.equal(E.localMap(read).wildlife.animals[0].meat,0);assert.equal(E.localMap(read).wildlife.animals[0].hide,1);assert.equal(knownWildlife(read).visible[0].hide,1);assert.match(wildlifeActions(read,a.id),/剥取/);E.localMap(read).wildlife.animals[0].hide=99;assert.throws(()=>E.validateSave(read),/生物/);

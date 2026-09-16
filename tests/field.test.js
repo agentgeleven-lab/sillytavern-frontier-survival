@@ -21,7 +21,7 @@ test('quick gathering before generation and precise gathering share quantities a
   F.enterField(s,F.demoField(s));fullyReveal(s);const map=E.localMap(s),o=Object.values(map.containers).find(o=>E.cell(s).resources.nodes[o.resourceId].remaining>0),n=E.cell(s).resources.nodes[o.resourceId],before=n.remaining;
   const path=E.approachPath(s,o.x,o.y);if(path.length)E.move(s,path.at(-1).x,path.at(-1).y);F.gather(s,o.x,o.y);assert.equal(n.remaining,before-1);
   const layout=JSON.stringify(map);exit(s);F.enterField(s,null);assert.equal(E.cell(s).resources.nodes[o.resourceId].remaining,before-1);assert.deepEqual(E.localMap(s).grid,JSON.parse(layout).grid);
-  exit(s);s.bag={};while(!E.cell(s).depleted)F.quickGather(s);assert.throws(()=>F.quickGather(s),/耗尽/);F.enterField(s,null);assert.ok(Object.values(E.cell(s).resources.nodes).every(n=>n.remaining===0));E.validateSave(s);
+  exit(s);s.bag={};delete s.provisions;while(!E.cell(s).depleted)F.quickGather(s);assert.throws(()=>F.quickGather(s),/耗尽/);F.enterField(s,null);assert.ok(Object.values(E.cell(s).resources.nodes).every(n=>n.remaining===0));E.validateSave(s);
 });
 test('legacy depleted ground stays depleted when first entering its local map',()=>{
   const s=game();E.cell(s).depleted=true;F.enterField(s,F.demoField(s));assert.ok(Object.values(E.cell(s).resources.nodes).every(n=>n.remaining===0));E.validateSave(s);

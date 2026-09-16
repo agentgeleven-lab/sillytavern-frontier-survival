@@ -1,3 +1,4 @@
+import {survivalAction} from './src/survival.js';
 import {equipmentAction} from './src/equipment.js';
 import {huntingAction} from './src/hunting.js';
 import {knownWildlife} from './src/wildlife.js';
@@ -102,6 +103,7 @@ export function initialize(){
       else if(type==='door')E.door(s,p.x,p.y);
       else if(type==='leave')E.leave(s);
       else if(['approachAnimal','inspectAnimal','scareAnimal','attackAnimal','shootAnimal','butcherAnimal','skinAnimal','clearAnimal','cookMeat','processHide'].includes(type))huntingAction(s,type,p.actor);
+      else if(['buildFacility','campCook','smokeMeat','discardFood','bandage','treatInfection'].includes(type))survivalAction(s,type,p.item);
       else if(['craftGear','equipWeapon','stance'].includes(type))equipmentAction(s,type,p.item);
       else if(type==='observeWildlife'){E.assert(E.localMap(s)?.kind,'请进入自然地点观察');E.tick(s,5,0);E.log(s,`安静观察五分钟，目前看见 ${knownWildlife(s).visible.length} 个生物或遗骸。`);}
       else if(type==='rest')E.rest(s);
@@ -160,7 +162,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.11.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.12.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

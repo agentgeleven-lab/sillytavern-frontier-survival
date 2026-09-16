@@ -1,3 +1,5 @@
+import {gainFood,consumeFood,FOOD_LIFE} from './provisions.js';
+import {inflictWound} from './injury-data.js';
 import {weapon,cuttingTool,bowChance} from './equipment-data.js';
 import {changeSpirit} from './spirit.js';
 import * as E from './engine.js';
@@ -17,7 +19,7 @@ export function huntingAction(s,action,id){
   E.assert((s.bag[source]??0)>0,`缺少${E.ITEMS[source].name}`);
   E.assert(cook?cookingReady(s):cuttingTool(s),cook?'请靠近燃烧中的营火，燃料需至少 10 分钟':'加工皮料需要工具');
   E.assert(E.weight(s.bag)-E.ITEMS[source].weight+E.ITEMS[result].weight<=20,'背包空间不足');
-  s.bag[source]--;E.tick(s,rule.minutes,0);if(!s.ended){s.bag[result]=(s.bag[result]??0)+1;E.log(s,cook?'烤熟一份生肉，可食用恢复 30 饱食。':'加工一份皮料，得到一份布料。');}else E.log(s,'加工中健康耗尽，材料已消耗，未获得成品。');return;
+  let life;if(cook)life=consumeFood(s,s.bag,source,1,rule.minutes);else s.bag[source]--;E.tick(s,rule.minutes,0);if(!s.ended){gainFood(s,s.bag,result,1,cook?FOOD_LIFE.cookedmeat*(life-rule.minutes)/FOOD_LIFE.rawmeat:undefined);E.log(s,cook?'烤熟一份生肉，可食用恢复 30 饱食。':'加工一份皮料，得到一份布料。');}else E.log(s,'加工中健康耗尽，材料已消耗，未获得成品。');return;
  }
  const {m,a,distance}=selectedAnimal(s,id),name=SPECIES[a.species].name,w=weapon(s);
  const shooting=action==='shootAnimal';
@@ -39,7 +41,7 @@ export function huntingAction(s,action,id){
   const counter=a.hp>0&&distance<=1&&(attack?roll<.5:!success)?RETALIATION[a.species]:0;
   E.log(s,attack?`${w.name}攻击${name}，${success?`造成 ${damage} 点伤害${a.hp?'。':'，动物死亡。'}`:'未命中，箭矢已消耗。'}`:`驱赶${name}${success?'成功，动物尝试逃离。':'失败，未能持续驱离动物。'}`);
   E.tick(s,rule.minutes,0);
-  if(counter){changeSpirit(s,-counter*.5);s.stats.health=Math.max(0,s.stats.health-counter);s.ended=s.stats.health<=0;E.log(s,`${name}在接触中反击，损失 ${counter} 点健康、${counter*.5} 点精神${s.ended?'，角色已无法行动':''}。`);}return;
+  if(counter){inflictWound(s,counter);changeSpirit(s,-counter*.5);s.stats.health=Math.max(0,s.stats.health-counter);s.ended=s.stats.health<=0;E.log(s,`${name}在接触中反击，损失 ${counter} 点健康、${counter*.5} 点精神${s.ended?'，角色已无法行动':''}。`);}return;
  }
  E.assert(a.hp===0,'只能处理动物尸体');
  if(action==='clearAnimal'){s.stats.stamina-=rule.stamina;m.wildlife.animals=m.wildlife.animals.filter(b=>b.id!==id);E.tick(s,rule.minutes,0);E.log(s,`清理${name}遗骸，未取出的物资一并丢弃。`);return;}
@@ -48,5 +50,5 @@ export function huntingAction(s,action,id){
  E.assert((a[resource]??0)>0,'这部分资源已经耗尽');E.assert(corpseAge(s,a)+rule.minutes<(meat?720:1440),meat?'尸体即将或已经腐败，不能割取可用生肉':'尸体即将腐解，来不及剥皮');enoughWeight(s,item);
  // Reserve only this portion; predators may consume the rest during the work.
  a[resource]--;s.stats.stamina-=rule.stamina;E.tick(s,rule.minutes,0);
- if(!s.ended){s.bag[item]=(s.bag[item]??0)+1;E.log(s,`从${name}遗骸取得${E.ITEMS[item].name} ×1。`);}else E.log(s,'处理中健康耗尽，未取得预留的材料。');
+ if(!s.ended){gainFood(s,s.bag,item,1,meat?Math.max(1,720-corpseAge(s,a)):undefined);E.log(s,`从${name}遗骸取得${E.ITEMS[item].name} ×1。`);}else E.log(s,'处理中健康耗尽，未取得预留的材料。');
 }

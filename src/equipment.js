@@ -1,3 +1,4 @@
+import {craftMinutes} from './shelter-data.js';
 import * as E from './engine.js';
 import {GEAR,equipped} from './equipment-data.js';
 export function equipmentAction(s,action,item){
@@ -6,7 +7,7 @@ export function equipmentAction(s,action,item){
   E.assert(Object.hasOwn(GEAR,item),'未知装备配方');const r=GEAR[item],next={...s.bag};
   for(const[id,q]of Object.entries(r.cost)){E.assert((next[id]??0)>=q,`缺少${E.ITEMS[id].name}，需要 ${q} 份`);next[id]-=q;}
   next[item]=(next[item]??0)+(r.qty??1);E.assert(E.weight(next)<=20,'背包空间不足');
-  for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;E.tick(s,r.minutes);
+  for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;E.tick(s,craftMinutes(s,r.minutes));
   if(!s.ended){s.bag[item]=(s.bag[item]??0)+(r.qty??1);E.log(s,`制作${r.name} ×${r.qty??1}，尚未自动装备。`);}else E.log(s,'制作中健康耗尽，材料已消耗，未获得成品。');return;
  }
  if(action==='equipWeapon'){

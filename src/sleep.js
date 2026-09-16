@@ -1,3 +1,5 @@
+import {hasFacility} from './shelter-data.js';
+import {healWounds,injuryState} from './injury-data.js';
 import {changeSpirit,spiritValue} from './spirit.js';
 import * as E from './engine.js';
 import {SLEEP_PLACES,SLEEP_LIMIT,WAKE_THRESHOLD,sleepPlace,sleepMinutes} from './sleep-data.js';
@@ -12,7 +14,7 @@ function check(s,choice,turnOff){
   return minutes;
 }
 function settle(s,minutes,turnOff){
-  const start=s.time,place=sleepPlace(s),rates=SLEEP_PLACES[place],before={...s.stats,spirit:spiritValue(s)};
+  const start=s.time,place=sleepPlace(s),rates=SLEEP_PLACES[place],before={...s.stats,spirit:spiritValue(s)},beforeWounds={...injuryState(s)};
   if(turnOff&&s.lighting)s.lighting.active=null;
   let rainMinutes=0,reason='complete';
   for(let i=0;i<minutes;i++){
@@ -20,12 +22,13 @@ function settle(s,minutes,turnOff){
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
     E.tick(s,1,0,false);
     if(s.ended){reason='health';break;}
-    changeSpirit(s,(['building','shelter','fortified'].includes(place)?6:3)/60*(rain?.5:1));
-    s.stats.stamina=Math.min(100,s.stats.stamina+rates.stamina/60*(rain?.5:1));
+    changeSpirit(s,((['building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
+    s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1));
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
+    healWounds(s,1,hasFacility(s,'bed'));
     if(s.stats.food<=WAKE_THRESHOLD||s.stats.water<=WAKE_THRESHOLD){reason='needs';break;}
   }
-  return {start,end:s.time,requested:minutes,place,reason,before,after:{...s.stats},rainMinutes};
+  return {start,end:s.time,requested:minutes,place,reason,before,beforeWounds,afterWounds:{...injuryState(s)},after:{...s.stats},rainMinutes};
 }
 export function sleepPreview(s,choice='8h',turnOff=true){
   try{
@@ -33,6 +36,8 @@ export function sleepPreview(s,choice='8h',turnOff=true){
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);
     if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);
     if(!turnOff){const warning=lightWarning(s,report.end-report.start);if(warning)warnings.push(warning.replace(/抵达/g,'醒来'));}
+    if(injuryState(s).bleeding||injuryState(s).infection)warnings.push('仍有出血或感染，睡眠期间会持续损失健康；建议先治疗');
+    if(hasFacility(s,'bed'))warnings.push('床铺生效：每小时额外恢复 6 体力、2 精神，创伤休养速度加倍');
     const fire=E.localMap(s)?.fire;if(fire?.lit&&fireRemaining(s,fire)>0&&fireRemaining(s,fire)<=report.end-report.start)warnings.push('当地营火将在醒来前或醒来时燃尽');
     return {...report,warnings,activeLight:lightState(s).active,error:null};
   }catch(e){return {error:e.message};}
