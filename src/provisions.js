@@ -1,7 +1,7 @@
 // Quantities remain in the existing inventory. Batches account for every perishable unit.
 export const FOOD_LIFE={food:10080,rawmeat:720,cookedmeat:1440,smokedmeat:10080};
 const check=(ok,message)=>{if(!ok)throw Error(message);};
-export function holders(s){return [{holder:s,bag:s.bag,rate:1},...Object.values(s.world.cells).filter(c=>c.camp).map(c=>({holder:c.camp,bag:c.camp.storage,rate:c.camp.facilities?.cellar?.25:1})),...Object.values(s.locals).flatMap(m=>Object.values(m.containers).filter(c=>c.searched&&!c.resourceId).map(c=>({holder:c,bag:c.items,rate:1})))];}
+export function holders(s){return [{holder:s,bag:s.bag,rate:1},...Object.values(s.world.cells).filter(c=>c.camp).map(c=>({holder:c.camp,bag:c.camp.storage,rate:!c.camp.layout&&c.camp.facilities?.cellar?.25:1})),...Object.values(s.world.cells).flatMap(c=>(c.camp?.layout?.objects??[]).filter(o=>o.items).map(o=>({holder:o,bag:o.items,rate:o.type==='cellar'?.25:1}))),...Object.values(s.locals).flatMap(m=>Object.values(m.containers).filter(c=>c.searched&&!c.resourceId).map(c=>({holder:c,bag:c.items,rate:1})))];}
 function entry(s,bag){const e=holders(s).find(e=>e.bag===bag);check(e,'找不到食物所在物品栏');return e;}
 export function initializeFood(s,e,time=s.foodSince??s.time){
  if(e.holder.provisions)return e.holder.provisions;
