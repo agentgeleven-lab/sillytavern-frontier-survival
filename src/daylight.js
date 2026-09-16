@@ -1,3 +1,4 @@
+import {lightState,fireRemaining,LIGHTS,DIRECTIONS} from './lighting-data.js';
 // Minutes are authoritative; phases and sight are derived, never saved as a second clock.
 export const PHASES=[
   {id:'deepNight',name:'深夜',start:0,end:300,region:1,local:2},
@@ -21,8 +22,17 @@ export function daylightReaches(map,x,y){
   }return false;
 }
 export function localSight(s,map,from,x,y){
+  if(sightLine(map,from,x,y,8)&&artificialLight(s,map,from,x,y))return true;
   const radius=map.kind==='cave'?2:phaseAt(s.time).local;
   if(!sightLine(map,from,x,y,radius))return false;
   if(map.kind==='field'||map.kind==='cave'||radius===2)return true;
   return Math.max(Math.abs(x-from.x),Math.abs(y-from.y))<=2||daylightReaches(map,x,y);
+}
+export function artificialLight(s,map,from,x,y){
+ const l=lightState(s),dx=x-from.x,dy=y-from.y;
+ if(l.active&&l[l.active]>0&&sightLine(map,from,x,y,LIGHTS[l.active].radius)){
+  if(l.active==='torch')return true;
+  const [a,b]=DIRECTIONS[l.facing],forward=dx*a+dy*b,side=Math.abs(dx*b-dy*a);if(forward>=0&&side<=forward)return true;
+ }
+ const f=map.fire;return !!(f?.lit&&fireRemaining(s,f)>0&&sightLine(map,f,x,y,LIGHTS.fire.radius));
 }

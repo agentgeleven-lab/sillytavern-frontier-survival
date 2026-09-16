@@ -1,4 +1,5 @@
 import {createDiagnostics,diagnosedRequest} from './src/diagnostics.js';
+import {lightingAction} from './src/lighting.js';
 import * as F from './src/field.js';
 import * as E from './src/engine.js';
 import { RegionGameStore as GameStore } from './src/region-store.js';
@@ -62,7 +63,8 @@ export function initialize(){
     await store.run(async(s,signal,transaction)=>{
       E.assert(!s.ended,'本局角色已无法行动，请导出记录并开始新游戏');
       const payload={background:s.background,theme:s.theme,seed:s.seed,known:JSON.parse(E.knownContext(s))};
-      if(type==='travel'){
+      if(['craftLight','lightOn','lightOff','reloadLight','faceLight','fireBuild','fireFeed','fireToggle'].includes(type))lightingAction(s,type,p.item);
+      else if(type==='travel'){
         const plan=W.travelPlan(s,p.x,p.y),oldCoord=W.regionKey(s);
         const survival=E.clone(s);E.tick(survival,plan.minutes);E.assert(!survival.ended,'当前补给或健康不足以完成旅行，未结算');
         let data=s.atlas.regions[E.key(p.x,p.y)]?await transaction.loadRegion(s,p.x,p.y):null;
@@ -150,7 +152,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.6.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.7.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

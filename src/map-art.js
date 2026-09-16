@@ -1,4 +1,6 @@
 import {TERRAINS,key,cell,localMap,canSee,regionVisible,phaseAt} from './engine.js';
+import {artificialLight} from './daylight.js';
+import {fireRemaining} from './lighting-data.js';
 import {RESOURCES} from './field-data.js';
 import {randomAt} from './environment.js';
 
@@ -51,6 +53,7 @@ function outdoor(g,s,map,x,y){
   if(t==='#'){if(!cave&&['f','.','m','a'].includes(c.terrain)){g.fillStyle='#69805b';g.fillRect(0,0,1,1);tree(g,.35,.58,1.3);tree(g,.72,.65,1.1);}else{g.fillStyle=cave?'#424c46':'#918c74';g.fillRect(0,0,1,1);rock(g,.48,.52,2);rock(g,.78,.79,.8);}}
   if(t==='E'){g.fillStyle='#d4c69c';g.fillRect(.12,.12,.76,.76);path(g,[[.5,.8],[.22,.48],[.41,.48],[.41,.2],[.59,.2],[.59,.48],[.78,.48]],'#46674f');if(!cave&&c.camp)camp(g);}
   for(const p of map.portals)if(p.x===x&&p.y===y){if(p.kind==='cave')pointArt(g,'cave');else roof(g,c.site?.size==='large');}
+  if(map.fire?.x===x&&map.fire.y===y){rock(g,.5,.67,1.1);if(canSee(s,x,y)&&map.fire.lit&&fireRemaining(s,map.fire)>0){path(g,[[.3,.64],[.4,.3],[.5,.45],[.6,.15],[.75,.65]],'#d18c47');path(g,[[.4,.65],[.53,.4],[.63,.66]],'#f5d888');}}
   const o=map.containers[key(x,y)];if(o){const n=c.resources.nodes[o.resourceId];g.save();if(!n.remaining)g.globalAlpha=.32;const art=RESOURCES[n.kind].art;if(art==='stone')rock(g,.5,.52,1.7);else pointArt(g,art);g.restore();if(!n.remaining){g.strokeStyle='#6b705c';g.lineWidth=.035;g.beginPath();g.moveTo(.28,.72);g.lineTo(.72,.28);g.stroke();}}
 }
 function prepare(canvas){const b=canvas.parentElement.getBoundingClientRect();if(b.width<1||b.height<1)return null;const dpr=window.devicePixelRatio||1;canvas.width=Math.round(b.width*dpr);canvas.height=Math.round(b.height*dpr);canvas.style.width=b.width+'px';canvas.style.height=b.height+'px';const g=canvas.getContext('2d');g.scale(dpr,dpr);g.fillStyle='#e2deca';g.fillRect(0,0,b.width,b.height);return {g,b};}
@@ -63,6 +66,7 @@ export function paintMap(canvas,s,{pan,selection,mapLevel}){
     if(!known)fog(g,x,y,s.seed);else if(map){if(map.kind)outdoor(g,s,map,x,y);else indoor(g,map,x,y);if(!canSee(s,x,y)){g.fillStyle='#26364c99';g.fillRect(0,0,1,1);}}
     else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);if(!regionVisible(s,x,y)){g.fillStyle='#26364c77';g.fillRect(0,0,1,1);}}
     if(known&&(map?canSee(s,x,y):regionVisible(s,x,y))&&phaseAt(s.time).local<=4){g.fillStyle=phaseAt(s.time).local===2?'#24345944':'#bb885322';g.fillRect(0,0,1,1);}
+    if(map&&known&&canSee(s,x,y)&&artificialLight(s,map,s.player.local,x,y)){g.fillStyle='#efbf6330';g.fillRect(0,0,1,1);}
     g.strokeStyle='#59694d12';g.lineWidth=.008;g.strokeRect(0,0,1,1);
     if(!map&&s.clues.some(c=>!c.revoked&&c.x===x&&c.y===y))ellipse(g,.84,.16,.07,.07,'#b68b42');
     if(selection?.x===x&&selection?.y===y){g.strokeStyle='#f8edc6';g.lineWidth=.07;g.strokeRect(.045,.045,.91,.91);g.strokeStyle='#58764f';g.lineWidth=.025;g.strokeRect(.045,.045,.91,.91);}g.restore();
