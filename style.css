@@ -115,3 +115,5 @@
 .fs-root .fs-simple-furniture{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.fs-root .fs-simple-furniture button{white-space:normal;text-align:left}.fs-root .fs-simple-furniture small{display:block;opacity:.7;margin-top:6px}.fs-root .fs-camp-tabs>span{font-size:12px;align-self:center}
 
 .fs-root .fs-room-panel{margin:16px 0;padding:12px;border:1px solid #a3b9a4;border-radius:8px;background:#edf1e4}.fs-root .fs-room-panel p{font-size:12px}.fs-root .fs-demolition{border:2px solid #b57a59;background:#f4e7d9;padding:14px;border-radius:8px;margin:14px 0}
+
+.fs-root .fs-benefit-tag{color:#375e42;background:#e2ecdc;border:1px solid #91ad84;border-radius:5px;padding:4px 8px}.fs-root .fs-benefits{border-left:3px solid #739969}

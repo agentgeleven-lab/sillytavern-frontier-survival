@@ -1,3 +1,4 @@
+import {sleepBenefit,recoveryBonus} from './positive-states.js';
 import {campBed} from './camp-rooms.js';
 import {timeFrozen,applyDevLocks} from './developer-data.js';
 import {hasFacility} from './shelter-data.js';
@@ -22,19 +23,21 @@ function settle(s,minutes,turnOff){
   for(let i=0;i<minutes;i++){
     const rain=place==='outdoor'&&s.weather==='小雨';if(rain)rainMinutes++;
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
-    E.tick(s,1,0,false);
+    const bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false);
     if(s.ended){reason='health';break;}
     changeSpirit(s,((['covered','building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
-    s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1));
+    s.stats.stamina=Math.min(100,s.stats.stamina+(rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1)+bonus);
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
     healWounds(s,1,hasFacility(s,'bed'));applyDevLocks(s);
     if(s.stats.food<=WAKE_THRESHOLD||s.stats.water<=WAKE_THRESHOLD){reason='needs';break;}
   }
-  return {start,end:s.time,requested:minutes,place,reason,before,beforeWounds,afterWounds:{...injuryState(s)},after:{...s.stats},rainMinutes};
+  const gainedRested=sleepBenefit(s,{start,end:s.time,place,reason});
+  return {gainedRested,start,end:s.time,requested:minutes,place,reason,before,beforeWounds,afterWounds:{...injuryState(s)},after:{...s.stats},rainMinutes};
 }
 export function sleepPreview(s,choice='8h',turnOff=true){
   try{
     const minutes=check(s,choice,turnOff),draft=E.clone(s),report=settle(draft,minutes,turnOff),warnings=[];
+    if(report.gainedRested)warnings.push('醒来将获得充分休息：6 小时内普通行动基础体力消耗降低 10%');
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);
     if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);
     if(!turnOff){const warning=lightWarning(s,report.end-report.start);if(warning)warnings.push(warning.replace(/抵达/g,'醒来'));}
@@ -48,6 +51,7 @@ export function sleepPreview(s,choice='8h',turnOff=true){
 export function sleep(s,choice='8h',turnOff=true){
   const minutes=check(s,choice,turnOff),r=settle(s,minutes,turnOff);
   s.lastSleep={start:r.start,end:r.end,requested:r.requested,place:r.place,reason:r.reason};
+  if(r.gainedRested)E.log(s,'获得充分休息：持续 6 小时。');
   E.refreshSight(s);
   E.log(s,`在${SLEEP_PLACES[r.place].name}睡了 ${r.end-r.start} 分钟，${WAKE_REASONS[r.reason]}。体力 ${Math.round(r.before.stamina)} → ${Math.round(r.after.stamina)}，精神 ${Math.round(r.before.spirit)} → ${Math.round(r.after.spirit)}，饱食 ${Math.round(r.after.food)}，水分 ${Math.round(r.after.water)}。${turnOff?'睡前已关闭随身照明。':''}`);
   return r;
