@@ -1,14 +1,10 @@
 import {applyDevLocks} from './developer-data.js';
-export const injuryState=s=>s.injuries??{trauma:0,bleeding:0,infection:0,exposure:0};
-export function inflictWound(s,damage){if(damage<2)return;const w=s.injuries??={...injuryState(s)};w.trauma=Math.min(100,w.trauma+damage*2);w.bleeding=Math.min(3,w.bleeding+(damage>=6?2:1));applyDevLocks(s);}
-export const injuryEffort=s=>1+injuryState(s).trauma/100;
-export const injuryDelay=s=>injuryState(s).trauma>=30?1:0;
-export function advanceInjuries(s,minutes){
- if(!s.injuries)return;const w=s.injuries;
- for(let i=0;i<minutes&&s.stats.health>0;i++){
-  if(w.bleeding>0){w.exposure++;if(w.exposure>=360){w.exposure=0;w.infection=Math.min(3,w.infection+1);}}
-  s.stats.health=Math.max(0,s.stats.health-w.bleeding*.01-w.infection*.005);applyDevLocks(s);
- }
-}
-export function healWounds(s,minutes,bed=false){if(!s.injuries)return;const w=s.injuries;if(!w.bleeding&&!w.infection&&s.stats.food>20&&s.stats.water>20)w.trauma=Math.max(0,w.trauma-minutes/60*(bed?4:2));}
-export function validateInjuries(s){if(s.injuries===undefined)return;const w=s.injuries;if(!w||!Number.isFinite(w.trauma)||w.trauma<0||w.trauma>100||![w.bleeding,w.infection].every(n=>Number.isInteger(n)&&n>=0&&n<=3)||!Number.isInteger(w.exposure)||w.exposure<0||w.exposure>=360)throw Error('伤势记录无效');}
+import {BODY_PARTS,emptyWound,ensureBody,syncBody,limbPenalty} from './body-data.js';
+import {randomAt} from './environment.js';
+export const injuryState=s=>s.injuries??emptyWound();
+export function inflictWound(s,damage,part){if(damage<2)return;const limbs=ensureBody(s),ids=Object.keys(BODY_PARTS),id=part??ids[Math.floor(randomAt(s.seed+':wound',s.time,s.revision)*ids.length)];if(!Object.hasOwn(BODY_PARTS,id))throw Error('受伤部位无效');const w=limbs[id];w.trauma=Math.min(100,w.trauma+damage*2);w.bleeding=Math.min(3,w.bleeding+(damage>=6?2:1));syncBody(s);applyDevLocks(s);return id;}
+export const injuryEffort=s=>1+injuryState(s).trauma/100+limbPenalty(s).arms/400;
+export const injuryDelay=s=>s.injuries?.limbs?(limbPenalty(s).legs>=60?2:limbPenalty(s).legs>=30?1:0):injuryState(s).trauma>=30?1:0;
+export function advanceInjuries(s,minutes){if(!s.injuries)return;const w=s.injuries;for(let i=0;i<minutes&&s.stats.health>0;i++){const parts=w.limbs?Object.values(w.limbs):[w];for(const p of parts){if(p.bleeding>0){p.exposure++;if(p.exposure>=360){p.exposure=0;p.infection=Math.min(3,p.infection+1);}}}syncBody(s);s.stats.health=Math.max(0,s.stats.health-w.bleeding*.01-w.infection*.005);applyDevLocks(s);}}
+export function healWounds(s,minutes,bed=false){if(!s.injuries||s.stats.food<=20||s.stats.water<=20)return;const w=s.injuries,parts=w.limbs?Object.values(w.limbs):[w],eligible=parts.filter(p=>!p.bleeding&&!p.infection&&p.trauma>0);if(eligible.length)for(const p of eligible)p.trauma=Math.max(0,p.trauma-minutes/60*(bed?4:2)/eligible.length);syncBody(s);}
+export function validateInjuries(s){if(s.injuries===undefined)return;const w=s.injuries,valid=p=>p&&Number.isFinite(p.trauma)&&p.trauma>=0&&p.trauma<=100&&[p.bleeding,p.infection].every(n=>Number.isInteger(n)&&n>=0&&n<=3)&&Number.isInteger(p.exposure)&&p.exposure>=0&&p.exposure<360;if(!valid(w))throw Error('伤势记录无效');if(w.limbs!==undefined){if(!w.limbs||Object.keys(w.limbs).length!==6||Object.keys(BODY_PARTS).some(id=>!valid(w.limbs[id])))throw Error('肢体伤势记录无效');const copy={injuries:structuredClone(w)};syncBody(copy);if(['trauma','bleeding','infection','exposure'].some(k=>Math.abs(copy.injuries[k]-w[k])>1e-8))throw Error('肢体伤势汇总不一致');}}

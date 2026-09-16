@@ -1,3 +1,4 @@
+import {setBodyValue} from './body-data.js';
 import {timeFrozen} from './developer-data.js';
 import * as E from './engine.js';
 import {FACILITIES,currentCamp,hasFacility} from './shelter-data.js';
@@ -18,8 +19,8 @@ export function survivalAction(s,action,item){
  if(action==='discardFood'){E.assert(item==='bag'||item==='camp'&&camp,'请选择背包或当前营地');const bag=item==='camp'?camp.storage:s.bag;E.assert(foodBatches(s,bag).some(b=>!b.life),'没有腐败食物');const n=discardSpoiled(s,bag);E.log(s,`丢弃 ${n} 份腐败食物。`);return;}
  const w=injuryState(s);E.assert(['bandage','treatInfection'].includes(action),'未知生存操作');
  if(action==='bandage'){
-  E.assert(w.bleeding>0,'没有需要止血的伤口');E.assert((s.bag.cloth??0)>0,'需要一份布料');s.bag.cloth--;E.tick(s,5,0);if(!s.ended){s.injuries.bleeding=0;s.injuries.exposure=0;E.log(s,'已包扎止血；创伤与既有感染仍需休养、治疗。');}
+  E.assert(w.bleeding>0,'没有需要止血的伤口');E.assert((s.bag.cloth??0)>0,'需要一份布料');s.bag.cloth--;E.tick(s,5,0);if(!s.ended){s.injuries.bleeding=0;s.injuries.exposure=0;setBodyValue(s,'bleeding',0);E.log(s,'已包扎止血；创伤与既有感染仍需休养、治疗。');}
  }else{
-  E.assert(w.infection>0||w.trauma>0||w.bleeding>0,'没有需要处理的伤势');E.assert((s.bag.medicine??0)>0,'需要一份医疗用品');s.bag.medicine--;E.tick(s,10,0);if(!s.ended){Object.assign(s.injuries,{bleeding:0,infection:0,exposure:0,trauma:Math.max(0,w.trauma-20)});s.stats.health=Math.min(100,s.stats.health+10);E.log(s,'医疗处理完成：止血、清除感染、创伤降低 20，健康恢复 10。');}
+  E.assert(w.infection>0||w.trauma>0||w.bleeding>0,'没有需要处理的伤势');E.assert((s.bag.medicine??0)>0,'需要一份医疗用品');s.bag.medicine--;E.tick(s,10,0);if(!s.ended){Object.assign(s.injuries,{bleeding:0,infection:0,exposure:0,trauma:Math.max(0,w.trauma-20)});for(const id of ['trauma','bleeding','infection'])setBodyValue(s,id,s.injuries[id]);s.stats.health=Math.min(100,s.stats.health+10);E.log(s,'医疗处理完成：止血、清除感染、创伤降低 20，健康恢复 10。');}
  }
 }

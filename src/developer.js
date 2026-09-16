@@ -11,7 +11,7 @@ export function developerAction(s,action,p={}){
   const locks={};for(const[id,value]of Object.entries(values)){setDevValue(s,id,value);if(p['lock_'+id]===true||p['lock_'+id]==='on')locks[id]=value;}
   s.developer.locks=locks;s.developer.timeLocked=p.timeLocked===true||p.timeLocked==='on';s.ended=s.stats.health<=0;E.log(s,'开发者已应用数值与锁定设置。');
  }else if(action==='devRestore'||action==='devClearWounds'){
-  const values=action==='devRestore'?{health:100,food:100,water:100,stamina:100,spirit:100,wet:0,cold:0,heat:0,trauma:0,bleeding:0,infection:0}:{trauma:0,bleeding:0,infection:0};for(const[id,value]of Object.entries(values)){setDevValue(s,id,value);if(Object.hasOwn(s.developer.locks,id))s.developer.locks[id]=value;}s.ended=s.stats.health<=0;E.log(s,action==='devRestore'?'开发者已恢复全部状态并清除伤势。':'开发者已清除伤势。');
+  const values=action==='devRestore'?{health:100,food:100,water:100,stamina:100,spirit:100,wet:0,cold:0,heat:0,trauma:0,bleeding:0,infection:0}:{trauma:0,bleeding:0,infection:0};for(const[id,value]of Object.entries(values)){setDevValue(s,id,value);if(Object.hasOwn(s.developer.locks,id))s.developer.locks[id]=value;}delete s.disease;if(s.waterHealth){s.waterHealth.severity=0;s.waterHealth.until=0;}s.ended=s.stats.health<=0;E.log(s,action==='devRestore'?'开发者已恢复全部状态并清除伤势。':'开发者已清除伤势。');
  }else if(action==='devAdvance'){
   E.assert(!timeFrozen(s),'请先解除时间冻结');const minutes=Number(p.minutes);E.assert(Number.isInteger(minutes)&&minutes>=1&&minutes<=10080,'推进时间须为 1—10080 分钟');E.tick(s,minutes,0);E.log(s,`开发者推进了 ${minutes} 分钟，生存规则照常结算。`);
  }else throw Error('未知开发者操作');

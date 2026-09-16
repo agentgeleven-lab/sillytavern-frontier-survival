@@ -1,3 +1,4 @@
+import {coldLevel} from './medical-data.js';
 import {FOODS} from './food-data.js';
 import {stomachLevel} from './water-data.js';
 // Durations use game minutes; old saves may omit benefits entirely.
@@ -6,7 +7,7 @@ export function activeBenefits(s){return Object.entries(BENEFITS).filter(([id])=
 export function benefitMinutes(s,id,from,to){return Math.max(0,Math.min(to,s.benefits?.[id]??from)-from);}
 export function grantBenefit(s,id){s.benefits??={};s.benefits[id]=s.time+BENEFITS[id].duration;}
 export function mealBenefit(s,id,before){if(FOODS[id]?.meal&&before<80&&s.stats.food>=80){grantBenefit(s,'satisfied');return true;}return false;}
-export function sleepBenefit(s,r){if((s.thermal?.cold??0)<25&&(s.thermal?.heat??0)<25&&!stomachLevel(s)&&r.reason==='complete'&&r.end-r.start>=360&&['covered','building','shelter','fortified'].includes(r.place)&&s.stats.stamina>=80&&s.stats.food>20&&s.stats.water>20&&!s.injuries?.bleeding&&!s.injuries?.infection){grantBenefit(s,'rested');return true;}return false;}
+export function sleepBenefit(s,r){if(!coldLevel(s)&&(s.thermal?.cold??0)<25&&(s.thermal?.heat??0)<25&&!stomachLevel(s)&&r.reason==='complete'&&r.end-r.start>=360&&['covered','building','shelter','fortified'].includes(r.place)&&s.stats.stamina>=80&&s.stats.food>20&&s.stats.water>20&&!s.injuries?.bleeding&&!s.injuries?.infection){grantBenefit(s,'rested');return true;}return false;}
 export function recoveryBonus(s,from,to,rate){return rate*.15*benefitMinutes(s,'satisfied',from,to)/60;}
 export function advanceBenefits(s,from){const n=benefitMinutes(s,'satisfied',from,s.time);if(n)s.stats.spirit=Math.min(100,(s.stats.spirit??100)+n/60);if(s.benefits)for(const[id,end]of Object.entries(s.benefits))if(end<=s.time)delete s.benefits[id];}
 export function validateBenefits(s){if(s.benefits===undefined)return;if(!s.benefits||typeof s.benefits!=='object'||Array.isArray(s.benefits))throw Error('正面状态无效');for(const[id,end]of Object.entries(s.benefits))if(!Object.hasOwn(BENEFITS,id)||!Number.isSafeInteger(end)||end<0||end>s.time+BENEFITS[id].duration)throw Error('正面状态期限无效');}

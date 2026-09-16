@@ -1,3 +1,4 @@
+import {BODY_PARTS} from './body-data.js';
 import {applyDevLocks,timeFrozen} from './developer-data.js';
 import {gainFood,consumeFood,FOOD_LIFE} from './provisions.js';
 import {inflictWound} from './injury-data.js';
@@ -42,7 +43,7 @@ export function huntingAction(s,action,id){
   const counter=a.hp>0&&distance<=1&&(attack?roll<.5:!success)?RETALIATION[a.species]:0;
   E.log(s,attack?`${w.name}攻击${name}，${success?`造成 ${damage} 点伤害${a.hp?'。':'，动物死亡。'}`:'未命中，箭矢已消耗。'}`:`驱赶${name}${success?'成功，动物尝试逃离。':'失败，未能持续驱离动物。'}`);
   E.tick(s,rule.minutes,0);
-  if(counter){inflictWound(s,counter);changeSpirit(s,-counter*.5);s.stats.health=Math.max(0,s.stats.health-counter);s.ended=s.stats.health<=0;applyDevLocks(s);E.log(s,`${name}在接触中反击，损失 ${counter} 点健康、${counter*.5} 点精神${s.ended?'，角色已无法行动':''}。`);}return;
+  if(counter){const hitPart=inflictWound(s,counter);changeSpirit(s,-counter*.5);s.stats.health=Math.max(0,s.stats.health-counter);s.ended=s.stats.health<=0;applyDevLocks(s);E.log(s,`${name}在接触中反击${hitPart?`，伤及${BODY_PARTS[hitPart]}`:''}，损失 ${counter} 点健康、${counter*.5} 点精神${s.ended?'，角色已无法行动':''}。`);}return;
  }
  E.assert(a.hp===0,'只能处理动物尸体');
  if(action==='clearAnimal'){s.stats.stamina-=rule.stamina;m.wildlife.animals=m.wildlife.animals.filter(b=>b.id!==id);E.tick(s,rule.minutes,0);E.log(s,`清理${name}遗骸，未取出的物资一并丢弃。`);return;}

@@ -1,3 +1,4 @@
+import {medicalRecovery,coldLevel} from './medical-data.js';
 import {thermalSnapshot,thermalRecovery,heaterFuel} from './temperature.js';
 import {campAt} from './camp-data.js';
 import {waterRecovery,stomachLevel} from './water-data.js';
@@ -26,7 +27,7 @@ function settle(s,minutes,turnOff){
   for(let i=0;i<minutes;i++){
     const rain=place==='outdoor'&&s.weather==='小雨';if(rain)rainMinutes++;
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
-    const recovery=waterRecovery(s)*thermalRecovery(s),bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false,'sleep');
+    const recovery=waterRecovery(s)*thermalRecovery(s)*medicalRecovery(s),bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false,'sleep');
     if(s.ended){reason='health';break;}
     changeSpirit(s,((['covered','building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
     s.stats.stamina=Math.min(100,s.stats.stamina+((rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1)+bonus)*recovery);
@@ -46,6 +47,7 @@ export function sleepPreview(s,choice='8h',turnOff=true){
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);
     if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);
     if(!turnOff){const warning=lightWarning(s,report.end-report.start);if(warning)warnings.push(warning.replace(/抵达/g,'醒来'));}
+    if(coldLevel(s))warnings.push('风寒病降低体力恢复，重症会持续损失健康');
     if(injuryState(s).bleeding||injuryState(s).infection)warnings.push('仍有出血或感染，睡眠期间会持续损失健康；建议先治疗');
     const bed=campBed(s);if(bed)warnings.push(`使用${bed.bed.name} (${bed.bed.x},${bed.bed.y})：${bed.label}；封闭且屋顶完整才享受营地等级加成`);
     if(hasFacility(s,'bed'))warnings.push('床铺生效：每小时额外恢复 6 体力、2 精神，创伤休养速度加倍');

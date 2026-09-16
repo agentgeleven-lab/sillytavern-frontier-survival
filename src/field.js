@@ -33,6 +33,7 @@ export function enterField(s,raw,zone='field'){
 }
 function collect(s,entries,minutes){
   const items={};for(const[n,q]of entries){E.assert(n.remaining>=q&&q>0,'资源已耗尽');const item=RESOURCES[n.kind].item;items[item]=(items[item]??0)+q;}
+  for(const[n,q]of entries){const seed={vegetables:'vegseed',grain:'grainseed',herb:'herbseed'}[n.kind];if(seed&&n.remaining===q)items[seed]=(items[seed]??0)+1;}
   E.assert(E.weight(s.bag)+E.weight(items)<=20,'背包空间不足，请先存放物品');
   for(const[n,q]of entries)n.remaining-=q;
   for(const[id,q]of Object.entries(items))gainFood(s,s.bag,id,q,id==='food'?2880:undefined);

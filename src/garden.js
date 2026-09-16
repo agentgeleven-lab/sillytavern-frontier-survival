@@ -1,0 +1,9 @@
+import * as E from './engine.js';
+import {campAt,canUseCampObject} from './camp-data.js';
+import {CROPS,isGarden,gardenScale,plantSnapshot} from './garden-data.js';
+import {gainFood} from './provisions.js';
+import {rainCovered} from './water-data.js';
+export function gardenAction(s,action,p={}){E.assert(!s.ended&&s.player.camp,'请进入营地');const l=campAt(s).layout,o=l.objects.find(o=>o.id===p.id);E.assert(o&&isGarden(o)&&canUseCampObject(s,o),'请走到种植设施旁，或切换简易模式');const g=plantSnapshot(s,o,l),scale=gardenScale(o);if(action==='gardenSow'){E.assert(!g,'请先收获或清理已有作物');E.assert(Object.hasOwn(CROPS,p.crop),'未知作物');E.assert(!rainCovered(l,o),'请移除种植区上方屋顶，作物需要露天日照');const r=CROPS[p.crop];E.assert((s.bag[r.seed]??0)>=scale,`需要${E.ITEMS[r.seed].name} ${scale}`);s.bag[r.seed]-=scale;E.tick(s,15,0);if(!s.ended)o.plant={crop:p.crop,progress:0,water:720,stress:0,ripeAt:null,dead:false,at:s.time};E.log(s,s.ended?'播种中健康耗尽，未完成。':`播种${r.name}，初始土壤水分可维持 12 小时。`);return;}
+ E.assert(g,'这里尚未播种');if(action==='gardenWater'){E.assert(!g.dead&&g.ripeAt===null,'成熟或枯萎作物无需浇水');E.assert(g.water<=1440,'水分仍充足，稍后再浇');E.assert(['water','dirtywater'].includes(p.item)&&s.bag[p.item]>0,'需要饮用水或污水 1');s.bag[p.item]--;o.plant={...g,water:g.water+1440};E.tick(s,5,0);E.log(s,'浇水完成；种植用水不直接变成可饮用水。');return;}
+ if(action==='gardenHarvest'){E.assert(g.ripeAt!==null&&!g.dead,'作物尚未成熟或已经枯萎');const r=CROPS[g.crop],items={[g.crop]:r.yield*scale,[r.seed]:scale};E.assert(E.weight(s.bag)+E.weight(items)<=20,'背包空间不足');E.tick(s,10,0);if(!s.ended&&!o.plant.dead){for(const[id,q]of Object.entries(items))gainFood(s,s.bag,id,q);delete o.plant;E.log(s,`收获${r.name} ${r.yield*scale}，保留种子 ${scale}。`);}else E.log(s,'收获中未能完成，未获得物品。');return;}
+ E.assert(action==='gardenClear','未知种植操作');E.assert(g.dead,'只能清理枯萎作物；健康作物请等待收获');E.tick(s,5,0);if(!s.ended)delete o.plant;E.log(s,'清理枯萎作物，不返还种子。');}

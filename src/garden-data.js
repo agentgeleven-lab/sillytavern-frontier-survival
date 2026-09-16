@@ -1,0 +1,10 @@
+import {outdoorTemperature} from './temperature.js';
+import {waterWeather,rainCovered} from './water-data.js';
+export const CROPS={vegetables:{name:'蔬菜',seed:'vegseed',minutes:2880,yield:3},grain:{name:'谷物',seed:'grainseed',minutes:4320,yield:4},herb:{name:'草药',seed:'herbseed',minutes:2160,yield:3}};
+export const SEEDS={vegseed:{name:'蔬菜种子',weight:.05},grainseed:{name:'谷物种子',weight:.05},herbseed:{name:'草药种子',weight:.05}};
+export const isGarden=o=>['planter','garden'].includes(o.type);
+export const gardenScale=o=>o.type==='garden'?2:1;
+export function plantSnapshot(s,o,l){if(!o.plant)return null;const g={...o.plant},r=CROPS[g.crop],covered=rainCovered(l,o);for(let t=g.at;t<s.time&&!g.dead;t++){if(g.ripeAt!==null){if(t+1-g.ripeAt>=4320)g.dead=true;continue;}if(!covered&&waterWeather(s,t)==='小雨')g.water=Math.min(2880,g.water+4);const wet=g.water>0;g.water=Math.max(0,g.water-1);g.stress=Math.max(0,g.stress+(wet?-1:1));if(g.stress>=1440){g.dead=true;break;}if(wet&&!covered){const temp=outdoorTemperature(s,t);g.progress=Math.min(r.minutes,g.progress+(temp<5||temp>35?.25:1));if(g.progress>=r.minutes)g.ripeAt=t+1;}}g.at=s.time;return g;}
+export function settleGardens(s){for(const c of Object.values(s.world.cells)){const l=c.camp?.layout;if(l)for(const o of l.objects.filter(isGarden))if(o.plant)o.plant=plantSnapshot(s,o,l);}}
+export const plantStage=g=>!g?'空土':g.dead?'枯萎':g.ripeAt!==null?'成熟':g.progress<CROPS[g.crop].minutes/3?'幼苗':'生长中';
+export function validateGardens(s){for(const c of Object.values(s.world.cells))for(const o of c.camp?.layout?.objects??[]){const g=o.plant;if(g===undefined)continue;if(!isGarden(o)||!g||!Object.hasOwn(CROPS,g.crop)||!Number.isFinite(g.progress)||g.progress<0||g.progress>CROPS[g.crop].minutes||!Number.isInteger(g.water)||g.water<0||g.water>2880||!Number.isInteger(g.stress)||g.stress<0||g.stress>1440||typeof g.dead!=='boolean'||!Number.isSafeInteger(g.at)||g.at<0||g.at>s.time||!(g.ripeAt===null||Number.isSafeInteger(g.ripeAt)&&g.ripeAt>=0&&g.ripeAt<=g.at&&g.progress===CROPS[g.crop].minutes))throw Error('种植记录无效');}}

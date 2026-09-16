@@ -117,3 +117,18 @@
 .fs-root .fs-room-panel{margin:16px 0;padding:12px;border:1px solid #a3b9a4;border-radius:8px;background:#edf1e4}.fs-root .fs-room-panel p{font-size:12px}.fs-root .fs-demolition{border:2px solid #b57a59;background:#f4e7d9;padding:14px;border-radius:8px;margin:14px 0}
 
 .fs-root .fs-benefit-tag{color:#375e42;background:#e2ecdc;border:1px solid #91ad84;border-radius:5px;padding:4px 8px}.fs-root .fs-benefits{border-left:3px solid #739969}
+
+/* Body and inventory navigation use the existing light camp palette. */
+.fs-root .fs-body-diagram{display:block;width:min(100%,220px);height:290px;margin:12px auto}
+.fs-root .fs-body-diagram [role="button"]{cursor:pointer}
+.fs-root .fs-body-diagram [role="button"]:focus{outline:2px solid #4c654b}
+.fs-root .fs-body-parts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.fs-root .fs-body-parts small{display:block;font-size:12px;margin-top:5px}
+.fs-root .fs-body-parts [aria-pressed="true"],.fs-root .fs-bag-tabs [aria-pressed="true"]{background:#4c654b;color:#fffdf3}
+.fs-root .fs-medical-options article{padding:14px 0;border-bottom:1px solid #ccd3bf}
+.fs-root .fs-medical-options small{display:block;margin-top:6px}
+
+.fs-root .fs-bag-tabs button[aria-pressed="true"],.fs-root .fs-bag-tabs button[aria-pressed="true"]:hover:not(:disabled),.fs-root .fs-body-parts button[aria-pressed="true"],.fs-root .fs-body-parts button[aria-pressed="true"]:hover:not(:disabled){background:var(--fs-accent);color:#fffdf3}
+.fs-root .fs-body-parts button[aria-pressed="true"] small{color:#e9ecdf}
+
+.fs-root .fs-camp-tabs button[aria-pressed="true"]:hover:not(:disabled){background:var(--fs-accent);color:#fffdf3}
