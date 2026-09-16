@@ -1,3 +1,4 @@
+import {HARVEST,corpseAge,corpseFreshness} from './hunting-data.js';
 import {randomAt,habitatFor} from './environment.js';
 import {sightLine,localSight,phaseAt} from './daylight.js';
 export const SPECIES={
@@ -28,6 +29,7 @@ function reserve(s,t){
  const f=e.fauna,elapsed=Math.max(0,day(t)-f.day);
  if(elapsed){for(const id of Object.keys(SPECIES))f.stock[id]=Math.min(SPECIES[id].prey.length?4:12,f.stock[id]+elapsed*(SPECIES[id].prey.length?.25:1));f.day=day(t);}return f;
 }
+export function killAnimal(m,a,t){if(a.deadAt!==null)return;a.hp=0;a.state='dead';a.deadAt=t;a.meat=HARVEST[a.species].meat;a.hide=HARVEST[a.species].hide;a.target=null;delete a.fear;delete a.examinedAt;m.wildlife.deaths++;track(m,a,t,'remains');}
 function track(m,a,t,type){m.wildlife.tracks.push({x:a.x,y:a.y,species:a.species,time:t,type});m.wildlife.tracks=m.wildlife.tracks.slice(-24);}
 function spawn(s,m,t,species){
  const w=m.wildlife,f=reserve(s,t),live=w.animals.filter(a=>a.hp>0),pred=SPECIES[species].prey;
@@ -57,11 +59,11 @@ function minute(s,m,t,awake){
  // Four shared slices allow fractional speeds without giving fast animals an uninterrupted turn.
  for(let slice=0;slice<4;slice++){
  const order=w.animals.slice();if((t+slice)%2)order.reverse();
- for(const a of order){if(a.hp<=0)continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&dist(a,p)<= (def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??playerThreat;
+ for(const a of order){if(a.hp<=0)continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&dist(a,p)<= (def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??(a.fear&&a.fear.until>=t?a.fear:null)??playerThreat;
  let goal=null,running=false;
  if(threat){a.state='flee';running=a.stamina>5;a.target=null;goal=threat;}
  else{
- const corpse=w.animals.find(b=>b.hp===0&&b.meat>0&&def.prey.includes(b.species)&&canDetect(m,a,b));
+ const corpse=w.animals.find(b=>b.hp===0&&t-b.deadAt<720&&b.meat>0&&def.prey.includes(b.species)&&canDetect(m,a,b));
  if(corpse&&a.hunger>5){a.state='eat';goal=corpse;}
  else if(def.prey.length&&a.hunger>=40&&a.stamina>10){
  const prey=others.filter(b=>def.prey.includes(b.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0];
@@ -74,7 +76,7 @@ function minute(s,m,t,awake){
  if(a.state==='graze')a.hunger=clamp(a.hunger-.15);
  a.credit=Math.min(4,a.credit+(running?def.run:def.speed)/4);if(a.credit<1)continue;a.credit--;
  if(goal&&a.state==='eat'&&dist(a,goal)<=1){goal.meat=Math.max(0,goal.meat-1);a.hunger=clamp(a.hunger-35);continue;}
- if(goal&&a.state==='hunt'&&dist(a,goal)<=1){goal.hp=Math.max(0,goal.hp-1);a.stamina=clamp(a.stamina-2);if(!goal.hp){goal.state='dead';goal.deadAt=t;goal.meat=3;goal.target=null;w.deaths++;track(m,goal,t,'remains');a.state='eat';}continue;}
+ if(goal&&a.state==='hunt'&&dist(a,goal)<=1){goal.hp=Math.max(0,goal.hp-1);a.stamina=clamp(a.stamina-2);if(!goal.hp){killAnimal(m,goal,t);a.state='eat';}continue;}
  const occupied=(x,y)=>w.animals.some(b=>b.id!==a.id&&b.x===x&&b.y===y)||(s.player.local&&s.locals[s.player.local.site]===m&&s.player.local.x===x&&s.player.local.y===y);
  let step=null;
  if(a.state==='flee'){step=directions.map(([dx,dy])=>({x:a.x+dx,y:a.y+dy})).filter(q=>pass(m,q.x,q.y)&&!occupied(q.x,q.y)).sort((u,v)=>dist(v,goal)-dist(u,goal))[0];if(step&&dist(step,goal)<dist(a,goal))step=null;}
@@ -112,7 +114,7 @@ export function observeWildlife(s){
 export function knownWildlife(s){
  const m=s.player.local?s.locals[s.player.local.site]:null,w=m?.wildlife;
  if(!w)return {visible:[],tracks:[],memory:Object.values(s.locals).filter(m=>m.kind&&m.wildlife).flatMap(m=>m.wildlife.observations.filter(o=>s.time-o.time<=1440).map(o=>({...o,name:SPECIES[o.species].name,regionX:m.owner.x,regionY:m.owner.y,note:'历史观察，去向未确认'}))).slice(-16)};
- const visible=w.animals.filter(a=>localSight(s,m,s.player.local,a.x,a.y)).map(a=>({id:a.id,species:a.species,name:SPECIES[a.species].name,x:a.x,y:a.y,state:BEHAVIORS[a.state],speed:SPECIES[a.species].speed,run:SPECIES[a.species].run}));
+ const visible=w.animals.filter(a=>localSight(s,m,s.player.local,a.x,a.y)).map(a=>({id:a.id,species:a.species,name:SPECIES[a.species].name,x:a.x,y:a.y,state:BEHAVIORS[a.state],speed:SPECIES[a.species].speed,run:SPECIES[a.species].run,alive:a.hp>0,condition:a.hp<SPECIES[a.species].hp?'受伤':'未见明显伤势',...(a.examinedAt!==undefined?{examinedAt:a.examinedAt,hp:a.hp,meat:a.hp===0&&corpseAge(s,a)<720?a.meat:0,hide:a.hp===0?(a.hide??0):0,freshness:a.hp===0?corpseFreshness(s,a):null}:{})}));
  return {visible,tracks:w.tracks.filter(a=>s.time-a.time<=240&&localSight(s,m,s.player.local,a.x,a.y)).map(a=>({...a,name:SPECIES[a.species].name})),memory:w.observations.filter(o=>s.time-o.time<=1440&&!visible.some(a=>a.id===o.id)).map(o=>({...o,name:SPECIES[o.species].name}))};
 }
 export function validateWildlife(s){
@@ -121,7 +123,7 @@ export function validateWildlife(s){
  if(f){ok(f.version===1&&integer(f.day,-1,Math.floor(s.time/1440))&&integer(f.serial,0,1e9)&&f.stock&&Object.keys(f.stock).length===Object.keys(SPECIES).length);for(const id of Object.keys(SPECIES))ok(Number.isFinite(f.stock[id])&&f.stock[id]>=0&&f.stock[id]<=(SPECIES[id].prey.length?4:12));}
  const ids=new Set();
  for(const m of Object.values(s.locals)){const w=m.wildlife;if(!w)continue;ok(f&&['field','cave'].includes(m.kind)&&w.version===1&&w.cap==={small:4,normal:6,large:8}[m.size]&&integer(w.time,0,s.time)&&integer(w.check,0,Math.floor(w.time/180))&&w.check===Math.floor(w.time/180)&&integer(w.deaths,0,1e9)&&integer(w.departures,0,1e9)&&Array.isArray(w.animals)&&w.animals.length<=40&&w.animals.filter(a=>a.hp>0).length<=w.cap&&Array.isArray(w.tracks)&&w.tracks.length<=24&&Array.isArray(w.observations)&&w.observations.length<=16);
- const occupied=new Set();for(const a of w.animals){ok(typeof a.id==='string'&&a.id.length<100&&!ids.has(a.id)&&a.id.startsWith(`${s.atlas.x},${s.atlas.y}:`)&&integer(Number(a.id.split(':')[1]),1,f.serial)&&Object.hasOwn(SPECIES,a.species)&&speciesPool(s,m).includes(a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&pass(m,a.x,a.y)&&!occupied.has(k(a.x,a.y)));ids.add(a.id);occupied.add(k(a.x,a.y));ok(integer(a.hp,0,SPECIES[a.species].hp)&&Number.isFinite(a.stamina)&&a.stamina>=0&&a.stamina<=100&&Number.isFinite(a.hunger)&&a.hunger>=0&&a.hunger<=100&&Number.isFinite(a.credit)&&a.credit>=0&&a.credit<=4&&Object.hasOwn(BEHAVIORS,a.state)&&integer(a.born,0,w.time)&&integer(a.meat,0,3));ok(a.hp===0?a.state==='dead'&&integer(a.deadAt,a.born,w.time):a.deadAt===null&&a.state!=='dead');if(a.target)ok(typeof a.target.id==='string'&&a.target.id.length<100&&integer(a.target.x,1,m.w-2)&&integer(a.target.y,1,m.h-2)&&integer(a.target.until,0,w.time+6));}
+ const occupied=new Set();for(const a of w.animals){ok(typeof a.id==='string'&&a.id.length<100&&!ids.has(a.id)&&a.id.startsWith(`${s.atlas.x},${s.atlas.y}:`)&&integer(Number(a.id.split(':')[1]),1,f.serial)&&Object.hasOwn(SPECIES,a.species)&&speciesPool(s,m).includes(a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&pass(m,a.x,a.y)&&!occupied.has(k(a.x,a.y)));ids.add(a.id);occupied.add(k(a.x,a.y));ok(integer(a.hp,0,SPECIES[a.species].hp)&&Number.isFinite(a.stamina)&&a.stamina>=0&&a.stamina<=100&&Number.isFinite(a.hunger)&&a.hunger>=0&&a.hunger<=100&&Number.isFinite(a.credit)&&a.credit>=0&&a.credit<=4&&Object.hasOwn(BEHAVIORS,a.state)&&integer(a.born,0,w.time)&&integer(a.meat,0,3));ok(a.hp===0?a.state==='dead'&&integer(a.deadAt,a.born,w.time):a.deadAt===null&&a.state!=='dead');if(a.hide!==undefined)ok(integer(a.hide,0,HARVEST[a.species].hide));if(a.examinedAt!==undefined)ok(integer(a.examinedAt,0,s.time));if(a.fear)ok(integer(a.fear.x,0,m.w-1)&&integer(a.fear.y,0,m.h-1)&&integer(a.fear.until,0,w.time+5));if(a.target)ok(typeof a.target.id==='string'&&a.target.id.length<100&&integer(a.target.x,1,m.w-2)&&integer(a.target.y,1,m.h-2)&&integer(a.target.until,0,w.time+6));}
  for(const a of [...w.tracks,...w.observations])ok(Object.hasOwn(SPECIES,a.species)&&integer(a.x,1,m.w-2)&&integer(a.y,1,m.h-2)&&integer(a.time,0,s.time));for(const o of w.observations)ok(typeof o.id==='string'&&o.id.length<100&&Object.hasOwn(BEHAVIORS,o.state));for(const tr of w.tracks)ok(['footprint','remains'].includes(tr.type));
  }
 }

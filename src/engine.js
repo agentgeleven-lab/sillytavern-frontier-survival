@@ -11,6 +11,7 @@ import { REGION_SIZES, BUILDING_SIZES, rasterizeLayout } from './layout.js';
 export const VERSION = 2;
 export const TERRAINS = { '.': ['草地', '#54664b'], f: ['林地', '#344d41'], r: ['道路', '#77746a'], w: ['水域', '#365d68'], h: ['山地', '#887f69'], s:['沙地','#b9ad83'], n:['寒原','#b7c8bc'], m:['沼泽','#687e65'], a:['农田','#a6a06a'], u:['街区','#9b9685'] };
 export const ITEMS = {
+  rawmeat:{name:'生肉',weight:.5},cookedmeat:{name:'熟肉',weight:.3},hide:{name:'皮料',weight:.3},
   torch:{name:'火把',weight:.5},flashlight:{name:'手电',weight:.4},battery:{name:'电池',weight:.1},
   stone: {name:'石料',weight:1}, fiber:{name:'植物纤维',weight:.2},
   wood: { name: '木材', weight: 1 }, cloth: { name: '布料', weight: .2 }, scrap: { name: '金属零件', weight: .5 },
@@ -147,7 +148,7 @@ export function leave(s){const map=localMap(s);assert(map&&s.player.local.x===ma
 export function searchContainer(s,x,y,raw){const c=localMap(s)?.containers[key(x,y)];assert(c&&!c.resourceId&&adjacent(s,x,y),'请先走到容器的相邻位置');assert(!c.searched,'该容器已经搜索过');const loot=validateLoot(raw);c.searched=true;c.items=loot.items;c.description=loot.description;tick(s,10);log(s,`搜索${c.name}：${loot.description}`);}
 export function take(s,x,y,id,qty=1){const c=localMap(s)?.containers[key(x,y)];assert(c?.searched&&!c.resourceId&&adjacent(s,x,y),'需要在已搜索的容器旁');transfer(c.items,s.bag,id,qty);log(s,`拿取${ITEMS[id].name} ×${qty}。`);}
 export function transfer(from,to,id,qty,limit=20){assert(Object.hasOwn(ITEMS,id)&&Number.isInteger(qty)&&qty>0&&(from[id]??0)>=qty,'物品数量不足');assert(weight(to)+ITEMS[id].weight*qty<=limit,'背包负重超过 20 kg');from[id]-=qty;to[id]=(to[id]??0)+qty;}
-export function useItem(s,id){assert((s.bag[id]??0)>0&&['water','food','medicine'].includes(id),'没有可用的消耗品');s.bag[id]--;const stat={water:'water',food:'food',medicine:'health'}[id];s.stats[stat]=Math.min(100,s.stats[stat]+(id==='medicine'?25:30));log(s,`使用${ITEMS[id].name}。`);}
+export function useItem(s,id){assert((s.bag[id]??0)>0&&['water','food','medicine','cookedmeat'].includes(id),'没有可用的消耗品');s.bag[id]--;const stat={water:'water',food:'food',cookedmeat:'food',medicine:'health'}[id];s.stats[stat]=Math.min(100,s.stats[stat]+(id==='medicine'?25:30));log(s,`使用${ITEMS[id].name}。`);}
 export function campTransfer(s,id,toCamp){const c=cell(s);assert(c.camp&&!s.player.local,'需要位于营地外部');if(toCamp&&['torch','flashlight'].includes(id)&&lightState(s)[id]>0)assert((s.bag[id]??0)>1,'这件装备仍装有燃料或电量，请保留在背包中');transfer(toCamp?s.bag:c.camp.storage,toCamp?c.camp.storage:s.bag,id,1,toCamp?200:20);log(s,`${toCamp?'存入营地':'从营地取出'}${ITEMS[id].name}。`);}
 export function build(s,recipe){assert(Object.hasOwn(RECIPES,recipe)&&!s.player.local,'请在区域地图上选择建设');const c=cell(s),r=RECIPES[recipe];assert(c.terrain!== 'w','不能在水中建设');assert(recipe==='shelter'?!c.camp:c.camp?.level===1,'当前营地不符合建设条件');for(const [id,q]of Object.entries(r.cost))assert((s.bag[id]??0)>=q,`缺少${ITEMS[id].name}，需要 ${q}`);for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;tick(s,r.minutes);c.camp??={level:0,storage:{}};c.camp.level++;log(s,`完成${r.name}。`);}
 export function rest(s){const level=!s.player.local?cell(s).camp?.level??0:0;tick(s,60,0);if(s.ended){log(s,'休息中健康耗尽，无法继续恢复。');return;}s.stats.stamina=Math.min(100,s.stats.stamina+15+level*12);if(level&&s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+level*4);log(s,`休息一小时${level?'，庇护所改善了恢复效果':''}。`);}
