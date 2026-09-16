@@ -1,3 +1,5 @@
+import {thermalSnapshot,thermalRecovery,heaterFuel} from './temperature.js';
+import {campAt} from './camp-data.js';
 import {waterRecovery,stomachLevel} from './water-data.js';
 import {sleepBenefit,recoveryBonus} from './positive-states.js';
 import {campBed} from './camp-rooms.js';
@@ -24,7 +26,7 @@ function settle(s,minutes,turnOff){
   for(let i=0;i<minutes;i++){
     const rain=place==='outdoor'&&s.weather==='小雨';if(rain)rainMinutes++;
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
-    const recovery=waterRecovery(s),bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false);
+    const recovery=waterRecovery(s)*thermalRecovery(s),bonus=recoveryBonus(s,s.time,s.time+1,rates.stamina+(hasFacility(s,'bed')?6:0))*(rain?.5:1);E.tick(s,1,0,false,'sleep');
     if(s.ended){reason='health';break;}
     changeSpirit(s,((['covered','building','shelter','fortified'].includes(place)?6:3)+(hasFacility(s,'bed')?2:0))/60*(rain?.5:1));
     s.stats.stamina=Math.min(100,s.stats.stamina+((rates.stamina+(hasFacility(s,'bed')?6:0))/60*(rain?.5:1)+bonus)*recovery);
@@ -38,6 +40,7 @@ function settle(s,minutes,turnOff){
 export function sleepPreview(s,choice='8h',turnOff=true){
   try{
     const minutes=check(s,choice,turnOff),draft=E.clone(s),report=settle(draft,minutes,turnOff),warnings=[];
+    const temp=thermalSnapshot(s,s.time,'sleep');warnings.push(`床位环境 ${temp.temperature.toFixed(1)}℃，${temp.label}；淋湿与冷暖状态会影响恢复`);for(const o of campAt(s)?.layout?.objects??[])if(o.type==='heater'&&o.heater?.lit&&heaterFuel(o,s.time)<=report.end-report.start)warnings.push('营地暖炉将在本次睡眠中燃尽，请留意保暖');
     if(stomachLevel(s))warnings.push('肠胃不适：水分消耗加快、体力恢复降低；重度会持续损失健康');
     if(report.gainedRested)warnings.push('醒来将获得充分休息：6 小时内普通行动基础体力消耗降低 10%');
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);

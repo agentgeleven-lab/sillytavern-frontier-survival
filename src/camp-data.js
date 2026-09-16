@@ -3,6 +3,7 @@ export const CAMP_SIZES=[15,19,23,27];
 export const campSize=l=>l?.size??CAMP_SIZE;
 export const campExit=l=>({x:7,y:campSize(l)-1});
 export const FURNITURE={
+ heater:{name:'简易暖炉',w:1,h:1,cost:{stone:4,components:4,parts:1},minutes:60},metalbench:{name:'金属工作台',w:2,h:1,cost:{wood:4,components:4,scrap:2},minutes:60},chair:{name:'椅子',w:1,h:1,cost:{wood:2,components:2},minutes:20},armchair:{name:'扶手椅',w:1,h:1,cost:{wood:3,cloth:3,components:4},minutes:45},bookshelf:{name:'书架',w:2,h:1,cost:{wood:4,components:3},minutes:45},radio:{name:'收音机',w:1,h:1,cost:{components:4,parts:2,electronics:2},minutes:60},
  rainCollector:{name:'雨水收集器',w:1,h:1,cost:{wood:4,cloth:2,scrap:1},minutes:60},purifier:{name:'净水设备',w:1,h:1,cost:{wood:4,scrap:3},minutes:60},
  roof:{name:'木屋顶',w:1,h:1,cost:{wood:2},minutes:10},floor:{name:'木地板',w:1,h:1,cost:{wood:1},minutes:5},wall:{name:'木墙',w:1,h:1,cost:{wood:2},minutes:15},door:{name:'木门',w:1,h:1,cost:{wood:2,scrap:1},minutes:15},
  box:{name:'储物箱',w:1,h:1,cost:{wood:3},minutes:20,capacity:50},bed:{name:'床铺',w:1,h:2,cost:{wood:3,cloth:3},minutes:60},cellar:{name:'地窖',w:2,h:2,cost:{wood:4,stone:6},minutes:120,capacity:200},bench:{name:'工作台',w:2,h:1,cost:{wood:4,scrap:2},minutes:60},stove:{name:'灶台',w:1,h:1,cost:{stone:4,scrap:1},minutes:60},smoker:{name:'熏架',w:2,h:1,cost:{wood:3,scrap:1},minutes:60}};

@@ -1,3 +1,5 @@
+import {workshopError} from './workshop-data.js';
+import {heaterFuel} from './temperature.js';
 import {settleRain} from './water-data.js';
 import {expansionPlan,expansionBags} from './camp-expansion.js';
 import {batchPlan} from './camp-plans.js';
@@ -23,16 +25,16 @@ export function campAction(s,action,p={}){
  if(action==='campAutoPlace'){E.assert(simpleCamp(s),'请切换简易模式');E.assert(Object.hasOwn(FURNITURE,p.type),'未知家具');for(let y=1;y<campSize(l)-1;y++)for(let x=1;x<campSize(l)-1;x++)for(const rot of [0,1]){if(!placementError(l,{type:p.type,x,y,rot,id:'preview'},s.player.camp)){campAction(s,'campPlace',{type:p.type,x,y,rot});return;}}throw Error('营地没有合适的空位，请切换地图模式整理布局');}
  if(action==='campPlace'||action==='campRelocate'){
   const old=action==='campRelocate'?target(s,p,false):null,type=old?.type??p.type;E.assert(Object.hasOwn(FURNITURE,type),'未知家具');E.assert(!old||old.type!=='rainCollector'||!old.rain,'先取空雨水收集器再搬动');const f=FURNITURE[type],o={...(old??{}),id:old?.id??'f'+(l.serial+1),type,x:Number(p.x),y:Number(p.y),rot:Number(p.rot),name:old?.name??f.name};
-  E.assert(!old?.legacy||!Object.values(camp.storage).some(q=>q>0),'请先清空旧储物箱再搬动');E.assert(!old?.items||!Object.values(old.items).some(q=>q>0),'请先清空容器再搬动');
+  E.assert(!old||old.type!=='heater'||!old.heater?.lit,'先关闭暖炉再搬动');E.assert(!old?.legacy||!Object.values(camp.storage).some(q=>q>0),'请先清空旧储物箱再搬动');E.assert(!old?.items||!Object.values(old.items).some(q=>q>0),'请先清空容器再搬动');
   const error=placementError(l,o,s.player.camp,old?.id);E.assert(!error,error);
-  if(!old){if(type==='smoker')E.assert(l.objects.some(o=>o.type==='stove'),'先建设灶台');for(const[id,q]of Object.entries(f.cost))E.assert((s.bag[id]??0)>=q,'建设材料不足');for(const[id,q]of Object.entries(f.cost))s.bag[id]-=q;}
+  if(!old){const requirement=workshopError(s,type);E.assert(!requirement,requirement);if(type==='smoker')E.assert(l.objects.some(o=>o.type==='stove'),'先建设灶台');for(const[id,q]of Object.entries(f.cost))E.assert((s.bag[id]??0)>=q,'建设材料不足');for(const[id,q]of Object.entries(f.cost))s.bag[id]-=q;}
   E.tick(s,old?10:f.minutes);if(s.ended){E.log(s,'施工中健康耗尽，未完成。');return;}if(!old){l.serial++;if(f.capacity)o.items={};if(type==='door')o.open=false;if(type==='rainCollector'){o.rain=0;o.rainAt=s.time;}l.objects.push(o);}else Object.assign(old,o);E.log(s,`${old?'搬动':'建成'}${o.name}。`);
  }else if(action==='campRemove'){
-  const o=target(s,p);E.assert(o.type!=='rainCollector'||!o.rain,'先取空雨水收集器再拆除');E.assert(!o.legacy,'旧储物箱保留以兼容原有存档，可以搬动');E.assert(!o.items||!Object.values(o.items).some(q=>q>0),'先清空容器再拆除');E.assert(!(o.type==='stove'&&l.objects.some(a=>a.type==='smoker')&&l.objects.filter(a=>a.type==='stove').length===1),'请先拆除熏架');E.tick(s,10);if(!s.ended){l.objects=l.objects.filter(a=>a.id!==o.id);if(s.player.camp.bedId===o.id)delete s.player.camp.bedId;}E.log(s,s.ended?'拆除中健康耗尽，家具仍保留。':'拆除完成，不返还材料。');
+  const o=target(s,p);E.assert(o.type!=='heater'||!heaterFuel(o,s.time),'先耗尽暖炉燃料再拆除');E.assert(o.type!=='rainCollector'||!o.rain,'先取空雨水收集器再拆除');E.assert(!o.legacy,'旧储物箱保留以兼容原有存档，可以搬动');E.assert(!o.items||!Object.values(o.items).some(q=>q>0),'先清空容器再拆除');E.assert(!(o.type==='stove'&&l.objects.some(a=>a.type==='smoker')&&l.objects.filter(a=>a.type==='stove').length===1),'请先拆除熏架');E.tick(s,10);if(!s.ended){l.objects=l.objects.filter(a=>a.id!==o.id);if(s.player.camp.bedId===o.id)delete s.player.camp.bedId;}E.log(s,s.ended?'拆除中健康耗尽，家具仍保留。':'拆除完成，不返还材料。');
  }else if(action==='campDoor'){const o=target(s,p);E.assert(o.type==='door','这不是门');E.assert(!(s.player.camp.x===o.x&&s.player.camp.y===o.y),'请先离开门所在的格子');o.open=!o.open;E.tick(s,1);
  }else if(action==='campDeposit'||action==='campWithdraw'){
   const o=target(s,p),f=FURNITURE[o.type];E.assert(f.capacity,'这不是储物容器');const bag=campBag(camp,o),into=action==='campDeposit';
-  if(into&&equipped(s)===p.item)E.assert((s.bag[p.item]??0)>1,'先卸下装备再存入');if(into&&['torch','flashlight'].includes(p.item)&&lightState(s)[p.item]>0)E.assert((s.bag[p.item]??0)>1,'请保留已装载的照明装备');E.transfer(into?s.bag:bag,into?bag:s.bag,p.item,1,into?(o.legacy?200:f.capacity):20,s);
+  if(into&&p.item==='warmcoat'&&s.thermal?.coat)E.assert((s.bag.warmcoat??0)>1,'请先脱下保暖外套');if(into&&equipped(s)===p.item)E.assert((s.bag[p.item]??0)>1,'先卸下装备再存入');if(into&&['torch','flashlight'].includes(p.item)&&lightState(s)[p.item]>0)E.assert((s.bag[p.item]??0)>1,'请保留已装载的照明装备');E.transfer(into?s.bag:bag,into?bag:s.bag,p.item,1,into?(o.legacy?200:f.capacity):20,s);
  }else if(action==='campRename'){const o=target(s,p);E.assert(FURNITURE[o.type].capacity,'只能重命名容器');E.assert(typeof p.name==='string'&&p.name.trim().length>0&&p.name.trim().length<=40,'名称须为 1—40 字');o.name=p.name.trim();
  }else throw Error('未知营地操作');
  revealCamp(s);

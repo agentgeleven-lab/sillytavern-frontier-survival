@@ -1,0 +1,8 @@
+import {campAt,canUseCampObject} from './camp-data.js';
+export const MATERIALS={components:{name:'通用组件',weight:.2},parts:{name:'机械零件',weight:.3},electronics:{name:'电子元件',weight:.1},book:{name:'书籍',weight:.3},warmcoat:{name:'保暖外套',weight:1}};
+export const WORKSHOP_RECIPES={components:{name:'拆解金属零件',cost:{scrap:1},output:{components:3},minutes:10,level:1},fuel:{name:'劈制燃料',cost:{wood:1},output:{fuel:2},minutes:10,level:1},parts:{name:'加工机械零件',cost:{scrap:1,components:2},output:{parts:1},minutes:20,level:1,metal:true},electronics:{name:'组装电子元件',cost:{scrap:1,components:3,parts:1},output:{electronics:1},minutes:30,level:2,metal:true},warmcoat:{name:'缝制保暖外套',cost:{cloth:3,hide:2},output:{warmcoat:1},minutes:45,level:1}};
+export const benchLevel=o=>o.workshopLevel??1;
+export function usableBench(s,level=1){return !!s.player.camp&&campAt(s)?.layout?.objects.some(o=>o.type==='bench'&&benchLevel(o)>=level&&canUseCampObject(s,o));}
+export const UPGRADE_COSTS={2:{wood:4,components:6,parts:2},3:{wood:6,components:10,parts:4,electronics:2}};
+export function workshopError(s,type){const req={metalbench:1,heater:1,chair:1,armchair:2,bookshelf:2,radio:3}[type];return req&&!usableBench(s,req)?`需要使用 ${req} 级工作台（地图模式需在旁边）`:'';}
+export function validateWorkshop(s){for(const c of Object.values(s.world.cells))for(const o of c.camp?.layout?.objects??[]){if(o.workshopLevel!==undefined&&(o.type!=='bench'||![1,2,3].includes(o.workshopLevel)))throw Error('工作台等级无效');if(o.relaxAt!==undefined&&(!['chair','armchair','bookshelf','radio'].includes(o.type)||!Number.isSafeInteger(o.relaxAt)||o.relaxAt<0||o.relaxAt>s.time))throw Error('家具休闲记录无效');}if(s.relaxUntil!==undefined&&(!Number.isSafeInteger(s.relaxUntil)||s.relaxUntil<0||s.relaxUntil>s.time+180))throw Error('休闲恢复期限无效');}
