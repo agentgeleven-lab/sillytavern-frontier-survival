@@ -1,3 +1,4 @@
+import {cookMeal} from './src/cooking.js';
 import {workshopAction} from './src/workshop.js';
 import {waterAction} from './src/water.js';
 import {campAction} from './src/camp-game.js';
@@ -72,8 +73,9 @@ export function initialize(){
   async function act(type,p){
     await store.run(async(s,signal,transaction)=>{
       if(['devToggle','devGrant','devStats','devRestore','devClearWounds','devAdvance'].includes(type)){developerAction(s,type,p);return;}
+      if(type==='cookMeal'){cookMeal(s,p.recipe,p.qty);return;}
       if(['wearCoat','workshopCraft','upgradeBench','heaterFeed','heaterToggle','relaxFurniture'].includes(type)){workshopAction(s,type,p);return;}
-      if(['enterShore','collectWater','drinkDirty','boilWater','filterWater','craftFilter','treatStomach','rainTake','rainEmpty'].includes(type)){waterAction(s,type,p);return;}
+      if(['enterShore','fishWater','collectWater','drinkDirty','boilWater','filterWater','craftFilter','treatStomach','rainTake','rainEmpty'].includes(type)){waterAction(s,type,p);return;}
       if(['campExpand','campBatchPlace','campSelectBed','campSetMode','campAutoPlace','campEnter','campExit','campMove','campPlace','campRelocate','campRemove','campDoor','campDeposit','campWithdraw','campRename'].includes(type)){campAction(s,type,p);return;}
       if(s.player.camp){E.assert(!['travel','field','cave','enter','move','approach','leave','survey','build','deposit','withdraw'].includes(type),'请先从营地入口离开');if(type==='sleep')E.assert(nearCampFacility(s,'bed'),'请先走到床铺旁睡眠');}
       E.assert(!s.ended,'本局角色已无法行动，请导出记录并开始新游戏');
@@ -172,7 +174,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.21.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.22.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

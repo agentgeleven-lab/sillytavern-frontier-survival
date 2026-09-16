@@ -1,3 +1,4 @@
+import {cookingPanel} from './cooking-view.js';
 import {furnitureFunctionPanel,unlockNote} from './workshop-view.js';
 import {collectorPanel,waterPanel} from './water-view.js';
 import {expansionPanel} from './camp-expansion.js';
@@ -23,7 +24,7 @@ function campDetails(s,v,form=''){const c=campAt(s),l=c.layout,n=campSize(l),p=s
  let detail=`<label>选中家具<select data-camp-select><option value="">选择地图上的家具</option>${l.objects.map(o=>`<option value="${o.id}" ${v.id===o.id?'selected':''}>${esc(o.name)} (${o.x},${o.y})</option>`).join('')}</select></label>`+(v.mode==='build'?form:'<p>点击空地行走；点击家具查看操作。人物必须走到家具旁边才能使用。</p>');
  if(selected&&v.mode==='walk'){const near=canUseCampObject(s,selected);detail+=`<h3>${esc(selected.name)}</h3><p>${FURNITURE[selected.type].name} · ${near?'可以操作':'需要走到相邻位置'}</p>${selected.type==='door'?btn('campDoor',selected.open?'关门 · 1 分钟':'开门 · 1 分钟',`data-id="${selected.id}"`,!near):''}${btn('campMoveFurniture','搬动',`data-id="${selected.id}"`,s.ended)} ${btn('campRemovePreview','预览拆除',`data-id="${selected.id}"`,!near||selected.legacy)}${selected.type==='bed'?btn('campSleepPanel','使用床铺', `data-id="${selected.id}"`,!near):''}${selected.type==='bench'?btn('campCraftPanel','打开制作面板','',!near):''}${selected.type==='stove'?btn('campCook','烤肉 · 15 分钟','',!near):''}${selected.type==='smoker'?btn('smokeMeat','熏肉 · 120 分钟','',!near):''}`;
  if(FURNITURE[selected.type].capacity){const bag=campBag(c,selected),rows=(b,into)=>Object.entries(b).filter(([,q])=>q>0).map(([id,q])=>`<div class="fs-camp-stock"><span>${ITEMS[id].name} ×${q}</span>${btn(into?'campDeposit':'campWithdraw',into?'存入':'取出',`data-id="${selected.id}" data-item="${id}"`,!near||s.ended)}</div>`).join('')||'<p>空</p>';detail+=`<p>容量 ${weight(bag).toFixed(1)} / ${selected.legacy?200:FURNITURE[selected.type].capacity} kg${selected.type==='cellar'?' · 食物变质速度 ¼':''}</p><form data-form="campRename"><input name="id" type="hidden" value="${selected.id}"><label>箱子名称<input name="name" maxlength="40" value="${esc(selected.name)}" required></label><button ${!near?'disabled':''}>保存名称</button></form><h4>箱内物品</h4>${rows(bag,false)}<small>${foodBatches(s,bag).map(b=>`${ITEMS[b.id].name} ×${b.qty}：${b.life?`约 ${Math.ceil(b.life/(selected.type==='cellar'?.25:1)/60)} 小时`:'已腐败'}`).join('；')}</small><h4>随身背包</h4>${rows(s.bag,true)}`;}}
- if(selected&&v.mode==='walk'){detail+=collectorPanel(s,selected)+furnitureFunctionPanel(s,selected);if(['purifier','stove','bench'].includes(selected.type))detail+=waterPanel(s);}
+ if(selected&&v.mode==='walk'){detail+=collectorPanel(s,selected)+furnitureFunctionPanel(s,selected);if(['purifier','stove','bench'].includes(selected.type))detail+=waterPanel(s);if(selected.type==='stove')detail+=cookingPanel(s);}
  return detail;
 }
 

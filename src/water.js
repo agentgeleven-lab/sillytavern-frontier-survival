@@ -1,3 +1,5 @@
+import {gainFood} from './provisions.js';
+import {fishingLeft} from './water-data.js';
 import * as E from './engine.js';
 import {randomAt} from './environment.js';
 import {sourceReachable,shoreSpec,stomachLevel,settleRain} from './water-data.js';
@@ -6,6 +8,7 @@ import {hasFacility} from './shelter-data.js';
 import {cookingReady} from './hunting.js';
 export function waterAction(s,action,p={}){E.assert(!s.ended,'角色已无法行动');
  if(action==='enterShore'){const c=E.cell(s,p.x,p.y);E.assert(sourceReachable(s,c),'请站在已发现水域相邻的陆地上');const spec=shoreSpec(s,c);if(!s.locals[spec.id]){const m=E.validateLocal(spec,'small');Object.assign(m,{kind:'field',owner:{x:s.player.x,y:s.player.y},shore:{x:c.x,y:c.y},name:spec.description.split('，')[0],portals:[]});for(const o of Object.values(m.containers))o.searched=true;s.locals[spec.id]=m;}s.player.local={site:spec.id,...s.locals[spec.id].exit};E.tick(s,1);E.revealLocal(s);E.log(s,'进入岸边，水面不可步行。');return;}
+ if(action==='fishWater'){const m=E.localMap(s),c=m?.shore?E.cell(s,m.shore.x,m.shore.y):E.cell(s,p.x,p.y);if(m?.shore)E.assert(E.canSee(s,4,5)&&E.adjacent(s,4,5),'请走到岸边取水点旁');else E.assert(sourceReachable(s,c),'请站在水域相邻陆地上');E.assert(s.bag.fishingrod>0,'需要随身携带钓竿');E.assert(fishingLeft(s,c)>0,'本时段水域鱼获已用尽');E.assert(E.weight(s.bag)+.5<=20,'背包空间不足');const bucket=Math.floor(s.time/720),catches=3-fishingLeft(s,c);c.fishing={bucket,catches:catches+1};E.tick(s,20,0);if(!s.ended){gainFood(s,s.bag,'fish',1);E.log(s,'钓得鱼肉 1 份；同一水域每半天最多 3 份鱼获。');}return;}
  if(action==='collectWater'){const q=E.int(p.qty,1,5),m=E.localMap(s);if(m?.shore)E.assert(E.canSee(s,4,5)&&E.adjacent(s,4,5),'请走到岸边取水点旁');else E.assert(sourceReachable(s,E.cell(s,p.x,p.y)),'请站在水域相邻陆地上');E.assert(E.weight(s.bag)+q*.5<=20,'背包空间不足');E.tick(s,q*3,0);if(!s.ended){s.bag.dirtywater=(s.bag.dirtywater??0)+q;E.log(s,`采集污水 ${q} 份。`);}return;}
  if(action==='drinkDirty'){E.assert((s.bag.dirtywater??0)>0,'没有污水');s.bag.dirtywater--;s.stats.water=Math.min(100,s.stats.water+30);const w=s.waterHealth??={drinks:0,severity:0,until:0};w.drinks++;const sick=randomAt(s.seed+':dirty-water',w.drinks,23)<.6;if(sick){w.severity=Math.min(3,stomachLevel(s)+1);w.until=Math.min(s.time+1440,Math.max(s.time,w.until)+480);}E.log(s,sick?'冒险饮用污水，出现肠胃不适。':'冒险饮用污水，本次未出现不适。');return;}
  if(action==='treatStomach'){E.assert(stomachLevel(s)>0,'没有肠胃不适');E.assert((s.bag.medicine??0)>0,'需要医疗用品 1');s.bag.medicine--;E.tick(s,10,0);if(!s.ended){s.waterHealth.severity=Math.max(0,s.waterHealth.severity-1);if(!s.waterHealth.severity)s.waterHealth.until=0;E.log(s,'处理肠胃不适，严重程度降低一级。');}return;}

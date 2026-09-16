@@ -1,24 +1,24 @@
 import {randomAt} from './environment.js';
-export const RESOURCES={berries:{name:'浆果灌木',item:'food',art:'berries',minutes:6},deadwood:{name:'倒木与枯枝',item:'wood',art:'grove',minutes:8},stone:{name:'松散石块',item:'stone',art:'stone',minutes:8},fiber:{name:'纤维植物',item:'fiber',art:'reeds',minutes:6}};
+export const RESOURCES={vegetables:{name:'可食野菜',item:'vegetables',art:'reeds',minutes:6},grain:{name:'残留谷物',item:'grain',art:'reeds',minutes:8},berries:{name:'浆果灌木',item:'berries',art:'berries',minutes:6},deadwood:{name:'倒木与枯枝',item:'wood',art:'grove',minutes:8},stone:{name:'松散石块',item:'stone',art:'stone',minutes:8},fiber:{name:'纤维植物',item:'fiber',art:'reeds',minutes:6}};
 const check=(v,m)=>{if(!v)throw Error(m);};
 export function parcelSpec(s,c,zone='field'){
   const seed=`${s.seed}:parcel:${s.atlas.x},${s.atlas.y}:${c.x},${c.y}:${zone}`;
   const size=['small','normal','large'][Math.floor(randomAt(seed,0,0)*3)],dimension={small:11,normal:19,large:29}[size];
   return {id:`${zone}-${c.x}-${c.y}`,size,dimension,zone,seed,owner:{x:c.x,y:c.y},name:zone==='cave'?`${c.name} · 洞穴深处`:`${c.name} · 周边地块`,terrain:c.terrain};
 }
-export function initialResources(s,c){
+export function initialResources(s,c,version=2){
   const nodes={};
   for(const zone of ['field',...(c.poi?.kind==='cave'?['cave']:[])]){
     const spec=parcelSpec(s,c,zone);
-    const kinds=zone==='cave'?['stone','stone','stone']:['h','s','n','u','r'].includes(c.terrain)?['stone','stone','deadwood']:['berries','deadwood','fiber','stone','deadwood'];
+    const kinds=version===2&&zone==='field'&&c.terrain==='a'?['vegetables','grain','grain','fiber','stone']:version===2&&zone==='field'&&['.','f','m'].includes(c.terrain)?['berries','deadwood','fiber','stone','vegetables']:zone==='cave'?['stone','stone','stone']:['h','s','n','u','r'].includes(c.terrain)?['stone','stone','deadwood']:['berries','deadwood','fiber','stone','deadwood'];
     kinds.forEach((kind,i)=>{const total=1+Math.floor(randomAt(spec.seed,i,17)*3);nodes[`${zone}-${i}`]={kind,zone,total,remaining:c.depleted&&zone==='field'?0:total};});
   }
-  return {version:1,nodes};
+  return {version,nodes};
 }
 export function validateResources(s,c){
   if(!c.resources)return;
-  const expected=initialResources(s,c),r=c.resources;
-  check(r.version===1&&r.nodes&&Object.keys(r.nodes).length===Object.keys(expected.nodes).length,'资源记录不完整');
+  const r=c.resources,expected=initialResources(s,c,r.version);
+  check([1,2].includes(r.version)&&r.nodes&&Object.keys(r.nodes).length===Object.keys(expected.nodes).length,'资源记录不完整');
   for(const[id,e]of Object.entries(expected.nodes)){const n=r.nodes[id];check(n&&n.kind===e.kind&&n.zone===e.zone&&n.total===e.total&&Number.isInteger(n.remaining)&&n.remaining>=0&&n.remaining<=n.total,'资源数量或类型无效');}
   check(c.depleted===Object.values(r.nodes).filter(n=>n.zone==='field').every(n=>n.remaining===0),'快速搜集与资源点记录不一致');
 }
