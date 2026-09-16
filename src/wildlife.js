@@ -1,3 +1,5 @@
+import {changeSpirit,visibleDanger} from './spirit.js';
+import {stealth} from './equipment-data.js';
 import {HARVEST,corpseAge,corpseFreshness} from './hunting-data.js';
 import {randomAt,habitatFor} from './environment.js';
 import {sightLine,localSight,phaseAt} from './daylight.js';
@@ -55,11 +57,12 @@ function nextStep(m,a,target,occupied){
 }
 function minute(s,m,t,awake){
  const w=m.wildlife,p=awake&&s.player.local&&s.locals[s.player.local.site]===m?s.player.local:null;
+ if(p&&visibleDanger({...s,time:t}))changeSpirit(s,-2/60);
  for(const a of w.animals)if(a.hp>0){a.hunger=clamp(a.hunger+.06);a.stamina=clamp(a.stamina+.4);}
  // Four shared slices allow fractional speeds without giving fast animals an uninterrupted turn.
  for(let slice=0;slice<4;slice++){
  const order=w.animals.slice();if((t+slice)%2)order.reverse();
- for(const a of order){if(a.hp<=0)continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&dist(a,p)<= (def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??(a.fear&&a.fear.until>=t?a.fear:null)??playerThreat;
+ for(const a of order){if(a.hp<=0)continue;const def=SPECIES[a.species],others=w.animals.filter(b=>b.id!==a.id&&b.hp>0),danger=others.filter(b=>SPECIES[b.species].prey.includes(a.species)&&canDetect(m,a,b)).sort((x,y)=>dist(a,x)-dist(a,y))[0],playerThreat=p&&dist(a,p)<= (stealth(s)?1:def.prey.length?2:4)&&canDetect(m,a,p)?p:null,threat=danger??(a.fear&&a.fear.until>=t?a.fear:null)??playerThreat;
  let goal=null,running=false;
  if(threat){a.state='flee';running=a.stamina>5;a.target=null;goal=threat;}
  else{

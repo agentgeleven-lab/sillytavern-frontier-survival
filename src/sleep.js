@@ -1,3 +1,4 @@
+import {changeSpirit,spiritValue} from './spirit.js';
 import * as E from './engine.js';
 import {SLEEP_PLACES,SLEEP_LIMIT,WAKE_THRESHOLD,sleepPlace,sleepMinutes} from './sleep-data.js';
 import {lightState,lightWarning,fireRemaining} from './lighting-data.js';
@@ -11,7 +12,7 @@ function check(s,choice,turnOff){
   return minutes;
 }
 function settle(s,minutes,turnOff){
-  const start=s.time,place=sleepPlace(s),rates=SLEEP_PLACES[place],before={...s.stats};
+  const start=s.time,place=sleepPlace(s),rates=SLEEP_PLACES[place],before={...s.stats,spirit:spiritValue(s)};
   if(turnOff&&s.lighting)s.lighting.active=null;
   let rainMinutes=0,reason='complete';
   for(let i=0;i<minutes;i++){
@@ -19,6 +20,7 @@ function settle(s,minutes,turnOff){
     // Sleeping does not reveal passing daylight; only refresh visibility on waking.
     E.tick(s,1,0,false);
     if(s.ended){reason='health';break;}
+    changeSpirit(s,(['building','shelter','fortified'].includes(place)?6:3)/60*(rain?.5:1));
     s.stats.stamina=Math.min(100,s.stats.stamina+rates.stamina/60*(rain?.5:1));
     if(s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+rates.health/60);
     if(s.stats.food<=WAKE_THRESHOLD||s.stats.water<=WAKE_THRESHOLD){reason='needs';break;}
@@ -29,7 +31,7 @@ export function sleepPreview(s,choice='8h',turnOff=true){
   try{
     const minutes=check(s,choice,turnOff),draft=E.clone(s),report=settle(draft,minutes,turnOff),warnings=[];
     if(report.reason!=='complete')warnings.push(WAKE_REASONS[report.reason]);
-    if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力恢复减半`);
+    if(report.rainMinutes)warnings.push(`露天小雨 ${report.rainMinutes} 分钟，该段体力与精神恢复减半`);
     if(!turnOff){const warning=lightWarning(s,report.end-report.start);if(warning)warnings.push(warning.replace(/抵达/g,'醒来'));}
     const fire=E.localMap(s)?.fire;if(fire?.lit&&fireRemaining(s,fire)>0&&fireRemaining(s,fire)<=report.end-report.start)warnings.push('当地营火将在醒来前或醒来时燃尽');
     return {...report,warnings,activeLight:lightState(s).active,error:null};
@@ -39,6 +41,6 @@ export function sleep(s,choice='8h',turnOff=true){
   const minutes=check(s,choice,turnOff),r=settle(s,minutes,turnOff);
   s.lastSleep={start:r.start,end:r.end,requested:r.requested,place:r.place,reason:r.reason};
   E.refreshSight(s);
-  E.log(s,`在${SLEEP_PLACES[r.place].name}睡了 ${r.end-r.start} 分钟，${WAKE_REASONS[r.reason]}。体力 ${Math.round(r.before.stamina)} → ${Math.round(r.after.stamina)}，饱食 ${Math.round(r.after.food)}，水分 ${Math.round(r.after.water)}。${turnOff?'睡前已关闭随身照明。':''}`);
+  E.log(s,`在${SLEEP_PLACES[r.place].name}睡了 ${r.end-r.start} 分钟，${WAKE_REASONS[r.reason]}。体力 ${Math.round(r.before.stamina)} → ${Math.round(r.after.stamina)}，精神 ${Math.round(r.before.spirit)} → ${Math.round(r.after.spirit)}，饱食 ${Math.round(r.after.food)}，水分 ${Math.round(r.after.water)}。${turnOff?'睡前已关闭随身照明。':''}`);
   return r;
 }

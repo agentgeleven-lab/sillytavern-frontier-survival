@@ -1,3 +1,5 @@
+import {GEAR,equipped,stealth,validateEquipment} from './equipment-data.js';
+import {advanceSpirit} from './spirit.js';
 import {advanceWildlife,observeWildlife,knownWildlife,validateWildlife} from './wildlife.js';
 import {validateSleep} from './sleep-data.js';
 import {burnPortable,validateLighting,lightState,fireRemaining} from './lighting-data.js';
@@ -11,6 +13,7 @@ import { REGION_SIZES, BUILDING_SIZES, rasterizeLayout } from './layout.js';
 export const VERSION = 2;
 export const TERRAINS = { '.': ['草地', '#54664b'], f: ['林地', '#344d41'], r: ['道路', '#77746a'], w: ['水域', '#365d68'], h: ['山地', '#887f69'], s:['沙地','#b9ad83'], n:['寒原','#b7c8bc'], m:['沼泽','#687e65'], a:['农田','#a6a06a'], u:['街区','#9b9685'] };
 export const ITEMS = {
+  ...Object.fromEntries(Object.entries(GEAR).map(([id,r])=>[id,{name:r.name,weight:r.weight}])),
   rawmeat:{name:'生肉',weight:.5},cookedmeat:{name:'熟肉',weight:.3},hide:{name:'皮料',weight:.3},
   torch:{name:'火把',weight:.5},flashlight:{name:'手电',weight:.4},battery:{name:'电池',weight:.1},
   stone: {name:'石料',weight:1}, fiber:{name:'植物纤维',weight:.2},
@@ -64,7 +67,7 @@ export function validateWorld(raw, options = {}) {
 export function newGame(raw, { background = '', seed = 'frontier', mode = 'api', theme = 'waste' } = {}) {
   const s = { version: VERSION, id: globalThis.crypto.randomUUID(), revision: 0, seed, mode, theme, background: text(background, 30000),
     world: validateWorld(raw), atlas:{x:0,y:0,regions:{}}, player: { x: Math.floor(raw.terrain.length/2), y: Math.floor(raw.terrain.length/2), local: null }, time: 480, weather: '晴',
-    stats: { health: 100, food: 85, water: 85, stamina: 100 }, bag: { water: 2, food: 2, tool: 1, wood: 2, cloth: 1 },
+    stats: { health: 100, food: 85, water: 85, stamina: 100, spirit:100 }, bag: { water: 2, food: 2, tool: 1, wood: 2, cloth: 1 },
     locals: {}, clues: [], sync: {}, log: [], ended: false };
   s.weather=['晴','多云','小雨','多云'][parseInt(hash(s.seed+Math.floor(s.time/240)),36)%4];reveal(s); log(s, mode === 'demo' ? '离线演示：使用固定示例内容，不调用模型。' : '独立游戏已创建。地图、资源与行动在插件中结算。'); return s;
 }
@@ -84,10 +87,10 @@ export function pathfind(start, end, passable) {
 }
 export function tick(s, minutes, effort = 1, updateSight = true) {
   assert(!s.ended, '本局角色已无法行动，请读取存档或开始新游戏');
-  const previousTime=s.time;s.time += minutes;advanceWildlife(s,previousTime,updateSight);const exhausted=burnPortable(s,minutes);if(exhausted)log(s,exhausted);
+  const previousTime=s.time;s.time += minutes;advanceSpirit(s,previousTime,updateSight);advanceWildlife(s,previousTime,updateSight);const exhausted=burnPortable(s,minutes);if(exhausted)log(s,exhausted);
   s.stats.food = Math.max(0, s.stats.food-minutes*.025);
   s.stats.water = Math.max(0,s.stats.water-minutes*.045);
-  s.stats.stamina = Math.max(0,s.stats.stamina-minutes*.09*effort);
+  s.stats.stamina = Math.max(0,s.stats.stamina-minutes*.09*effort*((s.stats.spirit??100)<25?1.25:1));
   if(s.stats.food===0||s.stats.water===0) s.stats.health=Math.max(0,s.stats.health-minutes*.12);
   if(s.stats.stamina===0&&effort>0) s.stats.health=Math.max(0,s.stats.health-minutes*.035);
   s.weather=['晴','多云','小雨','多云'][parseInt(hash(s.seed+Math.floor(s.time/240)),36)%4];
@@ -133,13 +136,13 @@ export function enter(s, raw) {
 export function localPath(s,x,y) {const map=localMap(s);if(!map)return null;return pathfind(s.player.local,{x,y},(a,b)=>map.seen[key(a,b)]&&'.+E'.includes(tileAt(map,a,b))&&(tileAt(map,a,b)!=='+'||map.doors[key(a,b)])&&!map.containers[key(a,b)]);}
 export function approachPath(s,x,y){const map=localMap(s);if(!map||!map.seen[key(x,y)])return null;return [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy])=>localPath(s,x+dx,y+dy)).filter(p=>p!==null).sort((a,b)=>a.length-b.length)[0]??null;}
 export function regionPath(s,x,y) {return pathfind(s.player,{x,y},(a,b)=>{const c=cell(s,a,b);return c?.known&&c.terrain!=='w';});}
-export function stepMinutes(s,x,y,local=!!s.player.local){return local?1:cell(s,x,y).terrain==='h'?12:6;}
+export function stepMinutes(s,x,y,local=!!s.player.local){return local?(stealth(s)?2:1):cell(s,x,y).terrain==='h'?12:6;}
 export function routeMinutes(s,path){return path?.length?path.reduce((sum,p)=>sum+stepMinutes(s,p.x,p.y),0):0;}
 export function move(s,x,y) {
   assert(Number.isInteger(x)&&Number.isInteger(y),'目标坐标无效');
   const p=s.player.local, path=p?localPath(s,x,y):regionPath(s,x,y);
   assert(path&&path.length,'没有可通行的已知路线');
-  for(const step of path){if(s.ended)break;if(p){if(s.lighting)s.lighting.facing=step.x>p.x?'east':step.x<p.x?'west':step.y>p.y?'south':'north';p.x=step.x;p.y=step.y;tick(s,1);revealLocal(s);}else{s.player.x=step.x;s.player.y=step.y;tick(s,stepMinutes(s,step.x,step.y));reveal(s);}}
+  for(const step of path){if(s.ended)break;if(p){if(s.lighting)s.lighting.facing=step.x>p.x?'east':step.x<p.x?'west':step.y>p.y?'south':'north';p.x=step.x;p.y=step.y;tick(s,stepMinutes(s,step.x,step.y));revealLocal(s);}else{s.player.x=step.x;s.player.y=step.y;tick(s,stepMinutes(s,step.x,step.y));reveal(s);}}
   log(s,p?`移动到地点位置 ${p.x},${p.y}。`:`抵达${cell(s).name}（${s.player.x},${s.player.y}）。`);
 }
 export function adjacent(s,x,y) {const p=s.player.local;return p&&Math.abs(p.x-x)+Math.abs(p.y-y)===1;}
@@ -149,11 +152,11 @@ export function searchContainer(s,x,y,raw){const c=localMap(s)?.containers[key(x
 export function take(s,x,y,id,qty=1){const c=localMap(s)?.containers[key(x,y)];assert(c?.searched&&!c.resourceId&&adjacent(s,x,y),'需要在已搜索的容器旁');transfer(c.items,s.bag,id,qty);log(s,`拿取${ITEMS[id].name} ×${qty}。`);}
 export function transfer(from,to,id,qty,limit=20){assert(Object.hasOwn(ITEMS,id)&&Number.isInteger(qty)&&qty>0&&(from[id]??0)>=qty,'物品数量不足');assert(weight(to)+ITEMS[id].weight*qty<=limit,'背包负重超过 20 kg');from[id]-=qty;to[id]=(to[id]??0)+qty;}
 export function useItem(s,id){assert((s.bag[id]??0)>0&&['water','food','medicine','cookedmeat'].includes(id),'没有可用的消耗品');s.bag[id]--;const stat={water:'water',food:'food',cookedmeat:'food',medicine:'health'}[id];s.stats[stat]=Math.min(100,s.stats[stat]+(id==='medicine'?25:30));log(s,`使用${ITEMS[id].name}。`);}
-export function campTransfer(s,id,toCamp){const c=cell(s);assert(c.camp&&!s.player.local,'需要位于营地外部');if(toCamp&&['torch','flashlight'].includes(id)&&lightState(s)[id]>0)assert((s.bag[id]??0)>1,'这件装备仍装有燃料或电量，请保留在背包中');transfer(toCamp?s.bag:c.camp.storage,toCamp?c.camp.storage:s.bag,id,1,toCamp?200:20);log(s,`${toCamp?'存入营地':'从营地取出'}${ITEMS[id].name}。`);}
+export function campTransfer(s,id,toCamp){const c=cell(s);assert(c.camp&&!s.player.local,'需要位于营地外部');if(toCamp&&equipped(s)===id)assert((s.bag[id]??0)>1,'请先卸下这件武器再存入营地');if(toCamp&&['torch','flashlight'].includes(id)&&lightState(s)[id]>0)assert((s.bag[id]??0)>1,'这件装备仍装有燃料或电量，请保留在背包中');transfer(toCamp?s.bag:c.camp.storage,toCamp?c.camp.storage:s.bag,id,1,toCamp?200:20);log(s,`${toCamp?'存入营地':'从营地取出'}${ITEMS[id].name}。`);}
 export function build(s,recipe){assert(Object.hasOwn(RECIPES,recipe)&&!s.player.local,'请在区域地图上选择建设');const c=cell(s),r=RECIPES[recipe];assert(c.terrain!== 'w','不能在水中建设');assert(recipe==='shelter'?!c.camp:c.camp?.level===1,'当前营地不符合建设条件');for(const [id,q]of Object.entries(r.cost))assert((s.bag[id]??0)>=q,`缺少${ITEMS[id].name}，需要 ${q}`);for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;tick(s,r.minutes);c.camp??={level:0,storage:{}};c.camp.level++;log(s,`完成${r.name}。`);}
 export function rest(s){const level=!s.player.local?cell(s).camp?.level??0:0;tick(s,60,0);if(s.ended){log(s,'休息中健康耗尽，无法继续恢复。');return;}s.stats.stamina=Math.min(100,s.stats.stamina+15+level*12);if(level&&s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+level*4);log(s,`休息一小时${level?'，庇护所改善了恢复效果':''}。`);}
 export function survey(s,raw){assert(!s.player.local,'请在区域地图探索');const c=cell(s);assert(!c.depleted,'本格的首轮可采集资源已耗尽');assert(!c.resources,'本格应通过共享资源记录采集');const loot=validateLoot(raw);assert(weight(s.bag)+weight(loot.items)<=20,'背包空间不足，请先存放物品');for(const[id,q]of Object.entries(loot.items))s.bag[id]=(s.bag[id]??0)+q;c.surveyed=true;c.depleted=true;tick(s,25);log(s,`探索${c.name}：${loot.description}`);}
-export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,environment:knownEnvironment(s.world.environment),time:formatTime(s.time),lastSleep:s.lastSleep??null,wildlife:knownWildlife(s),lighting:{...lightState(s),fire:map?.fire?{x:map.fire.x,y:map.fire.y,lit:map.fire.lit&&fireRemaining(s,map.fire)>0,remaining:fireRemaining(s,map.fire)}:null},phase:phaseAt(s.time).name,sight:{region:phaseAt(s.time).region,local:map?(map.kind==='cave'?2:phaseAt(s.time).local):null,note:'无采光且无照明时仅两格；火把四格、手电前方六格、营火五格，均受遮挡；地图记忆不等于实时视野'},weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,localKind:map?.kind??(map?'building':null),localName:map?.name??c.site?.name??null,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},status:Object.fromEntries(Object.entries(s.stats).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visible:regionVisible(s,c.x,c.y),visited:c.visited,naturalPoint:c.poi?.kind??null})),visibleResources:map?.kind?Object.values(map.containers).filter(o=>map.seen[key(o.x,o.y)]&&canSee(s,o.x,o.y)).map(o=>({name:o.name,x:o.x,y:o.y,remaining:c.resources.nodes[o.resourceId].remaining,item:RESOURCES[o.kind].item})):[],visibleObjects:map&&!map.kind?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]&&canSee(s,c.x,c.y)).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
+export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,environment:knownEnvironment(s.world.environment),time:formatTime(s.time),lastSleep:s.lastSleep??null,wildlife:knownWildlife(s),lighting:{...lightState(s),fire:map?.fire?{x:map.fire.x,y:map.fire.y,lit:map.fire.lit&&fireRemaining(s,map.fire)>0,remaining:fireRemaining(s,map.fire)}:null},phase:phaseAt(s.time).name,sight:{region:phaseAt(s.time).region,local:map?(map.kind==='cave'?2:phaseAt(s.time).local):null,note:'无采光且无照明时仅两格；火把四格、手电前方六格、营火五格，均受遮挡；地图记忆不等于实时视野'},weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,localKind:map?.kind??(map?'building':null),localName:map?.name??c.site?.name??null,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},equipment:{weapon:equipped(s),stance:stealth(s)?'sneak':'walk'},status:Object.fromEntries(Object.entries({...s.stats,spirit:s.stats.spirit??100}).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visible:regionVisible(s,c.x,c.y),visited:c.visited,naturalPoint:c.poi?.kind??null})),visibleResources:map?.kind?Object.values(map.containers).filter(o=>map.seen[key(o.x,o.y)]&&canSee(s,o.x,o.y)).map(o=>({name:o.name,x:o.x,y:o.y,remaining:c.resources.nodes[o.resourceId].remaining,item:RESOURCES[o.kind].item})):[],visibleObjects:map&&!map.kind?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]&&canSee(s,c.x,c.y)).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
 export function formatTime(t){return `第 ${Math.floor(t/1440)+1} 天 · ${phaseAt(t).name} · ${String(Math.floor(t%1440/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;}
 export function validateSave(s){
   if(s?.version===1){s.version=2;s.atlas={x:0,y:0,regions:{}};s.world.sizeClass='small';for(const c of Object.values(s.world.cells))if(c.site)c.site.size??='normal';}
@@ -198,7 +201,7 @@ export function validateSave(s){
   if(s.world.environment)validateEnvironment(s.world.environment);
   if(s.world.ecology)validateEcology(s.world.ecology);
   for(const c of Object.values(s.world.cells))if(c.poi){assert(c.terrain!=='w'&&Object.hasOwn(NATURAL_POINTS,c.poi.kind),'自然地点存档无效');text(c.poi.id,100);text(c.poi.name,70);text(c.poi.description,400);}
-  validateLighting(s);validateSleep(s);validateWildlife(s);return s;
+  assert(s.stats.spirit===undefined||(Number.isFinite(s.stats.spirit)&&s.stats.spirit>=0&&s.stats.spirit<=100),'精神值无效');validateEquipment(s);validateLighting(s);validateSleep(s);validateWildlife(s);return s;
 }
 export function demoWorld(seed='demo'){const r=seeded(seed);const terrain=Array.from({length:9},(_,y)=>Array.from({length:9},(_,x)=>x===7?'w':y===4||x===4?'r':r()<.6?'f':'.').join(''));return {name:'雾松边境',description:'沿旧公路散布的建筑与林地。河流将东侧荒地与旧聚落分开。',terrain,sites:[{x:4,y:4,name:'公路补给站',kind:'便利店',description:'铁皮招牌在风中轻响。落满灰尘的货架后面，有一扇通往仓库的门。'},{x:3,y:2,name:'废弃林务所',kind:'小屋',description:'林务所的屋顶仍然完好。'},{x:5,y:6,name:'旧维修间',kind:'车间',description:'修理设备和零件散落在屋内。'}]};}
 export function demoLocal(){return {description:'柜台与货架围出营业区。东侧的门通向后仓。',grid:['################',' #........#.....#'.trim(),'#........#.....#','#........#.....#','#........+.....#','#........#.....#','#........#.....#','#........#######','#..............#','#..............#','#..............#','####E###########'],containers:[{x:2,y:2,name:'食品货架',kind:'货架'},{x:6,y:3,name:'旧工具柜',kind:'柜子'},{x:12,y:2,name:'后仓物资箱',kind:'箱子'},{x:11,y:5,name:'医疗储物柜',kind:'柜子'}]};}

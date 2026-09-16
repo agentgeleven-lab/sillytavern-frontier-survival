@@ -4,7 +4,7 @@ export function lightingAction(s,action,item){
  E.assert(!s.ended,'角色已无法行动');
  if(action==='craftLight'){
   const recipe=LIGHT_RECIPES[item];E.assert(recipe,'未知照明配方');for(const[id,q]of Object.entries(recipe.cost))E.assert((s.bag[id]??0)>=q,`缺少${E.ITEMS[id].name}，需要 ${q} 份`);
-  const next={...s.bag};for(const[id,q]of Object.entries(recipe.cost))next[id]-=q;next[item]=(next[item]??0)+1;E.assert(E.weight(next)<=20,'背包空间不足');s.bag=next;E.tick(s,recipe.minutes);E.log(s,`${recipe.name}完成。`);return;
+  const next={...s.bag};for(const[id,q]of Object.entries(recipe.cost))next[id]-=q;next[item]=(next[item]??0)+1;E.assert(E.weight(next)<=20,'背包空间不足');s.bag=next;if(s.equipment?.weapon&&!(next[s.equipment.weapon]>0))s.equipment.weapon=null;E.tick(s,recipe.minutes);E.log(s,`${recipe.name}完成。`);return;
  }
  s.lighting??={...lightState(s)};const l=s.lighting;
  if(action==='lightOn'){

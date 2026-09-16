@@ -97,3 +97,5 @@
 .fs-root .fs-wildlife-panel{border-top:1px solid #cbd0be;padding-top:18px;margin-top:18px}.fs-root .fs-wildlife-panel details{margin-top:12px}.fs-root .fs-wildlife-panel .fs-object-list>small{display:block;margin:0 0 10px;color:#74816a}
 
 .fs-root .fs-animal-actions{padding:12px;margin:14px 0;border:1px solid #c1cbb4;border-radius:10px;background:#eef0e4}.fs-root .fs-animal-actions h3{margin-top:0}
+
+.fs-root .fs-equipment{padding:16px;border:1px solid var(--fs-line);border-radius:9px;background:#eef1e5;margin-bottom:18px}.fs-root .fs-equipment h3{margin-top:4px}.fs-root .fs-equipment-stance{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 0}.fs-root .fs-equipment-stance small{flex-basis:100%}.fs-root .fs-equipment-stance button{font-size:11px}.fs-root .fs-stat{min-width:0}@media(max-width:650px){.fs-root .fs-statusbar{flex-wrap:wrap}.fs-root .fs-stat{flex:1 1 50px}}
