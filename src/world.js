@@ -70,10 +70,11 @@ export function travelPlan(s,x,y){
 }
 export function installRegion(s,x,y,data,plan){
   // All travel mutations happen on a transaction draft, after generation/validation succeeded.
-  for(const p of plan.path){s.player.x=p.x;s.player.y=p.y;reveal(s);}
+  for(const p of plan.path){s.player.x=p.x;s.player.y=p.y;tick(s,cell(s,p.x,p.y).terrain==='h'?12:6);reveal(s);}
+  tick(s,30);assert(!s.ended,'当前补给或健康不足以完成旅行，未结算');
   summarizeRegion(s);
   const old=regionData(s);
-  tick(s,plan.minutes);assert(!s.ended,'当前补给或健康不足以完成旅行，未结算');
+  // Travel time was advanced step by step so changing light reveals only the correct radius.
   s.atlas.x=x;s.atlas.y=y;Object.assign(s,clone(data));
   const opposite=DIRECTIONS[plan.side].opposite;
   if(!s.world.gates){const center=Math.floor(s.world.size/2);s.player={x:center,y:center,local:null};ensureGates(s);}

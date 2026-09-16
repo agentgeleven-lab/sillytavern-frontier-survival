@@ -1,3 +1,5 @@
+import {phaseAt,sightLine,localSight} from './daylight.js';
+export {phaseAt} from './daylight.js';
 import {validateResources,validateFieldMetadata,RESOURCES} from './field-data.js';
 import {NATURAL_POINTS,validateEnvironment,validateEcology,knownEnvironment} from './environment.js';
 import {readTerrain} from './terrain-input.js';
@@ -24,7 +26,7 @@ export function hash(value) { let n = 2166136261; for (const c of String(value))
 export function seeded(seed) { let n = parseInt(hash(seed), 36); return () => { n |= 0; n = n + 0x6D2B79F5 | 0; let t = Math.imul(n ^ n >>> 15, 1 | n); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 export function log(s, message) { s.log.push({ id: `${s.revision}-${s.log.length}`, time: s.time, text: String(message).slice(0, 1500) }); s.log = s.log.slice(-120); }
 export function cell(s, x = s.player.x, y = s.player.y) { return s.world.cells[key(x, y)]; }
-export function reveal(s) { for (let y = s.player.y - 1; y <= s.player.y + 1; y++) for (let x = s.player.x - 1; x <= s.player.x + 1; x++) { const c = cell(s, x, y); if (c) c.known = true; } cell(s).visited = true; }
+export function reveal(s) { const radius=phaseAt(s.time).region;for (let y = s.player.y - radius; y <= s.player.y + radius; y++) for (let x = s.player.x - radius; x <= s.player.x + radius; x++) { const c = cell(s, x, y); if (c) c.known = true; } cell(s).visited = true; }
 export function validateWorld(raw, options = {}) {
   const n=options.size?REGION_SIZES[options.size]:raw?.terrain?.length;
   assert(Object.values(REGION_SIZES).includes(n),'区域尺寸必须为 9、15 或 21');
@@ -84,7 +86,7 @@ export function tick(s, minutes, effort = 1) {
   if(s.stats.food===0||s.stats.water===0) s.stats.health=Math.max(0,s.stats.health-minutes*.12);
   if(s.stats.stamina===0&&effort>0) s.stats.health=Math.max(0,s.stats.health-minutes*.035);
   s.weather=['晴','多云','小雨','多云'][parseInt(hash(s.seed+Math.floor(s.time/240)),36)%4];
-  s.ended=s.stats.health<=0;
+  s.ended=s.stats.health<=0;refreshSight(s);
 }
 export function weight(bag) { return Object.entries(bag).reduce((n,[id,qty])=>n+(ITEMS[id]?.weight??0)*qty,0); }
 export function validateLoot(raw) {
@@ -113,13 +115,11 @@ export function validateLocal(raw, size='normal') {
 }
 export function localMap(s) { return s.player.local ? s.locals[s.player.local.site] : null; }
 export function tileAt(map,x,y){return map.grid[y]?.[x]??'#';}
-export function visible(map, from, x, y) {
-  const steps=Math.max(Math.abs(x-from.x),Math.abs(y-from.y));
-  if(steps>8)return false;
-  for(let i=1;i<steps;i++){const a=Math.round(from.x+(x-from.x)*i/steps),b=Math.round(from.y+(y-from.y)*i/steps),t=tileAt(map,a,b);if(t==='#'||t==='_'||(t==='+'&&!map.doors[key(a,b)]))return false;}
-  return true;
-}
-export function revealLocal(s) {const map=localMap(s);if(!map)return;for(let y=0;y<map.h;y++)for(let x=0;x<map.w;x++)if(visible(map,s.player.local,x,y))map.seen[key(x,y)]=true;}
+export function visible(map, from, x, y, radius=8) {return sightLine(map,from,x,y,radius);}
+export function regionVisible(s,x,y){return !s.player.local&&Math.max(Math.abs(x-s.player.x),Math.abs(y-s.player.y))<=phaseAt(s.time).region&&!!cell(s,x,y);}
+export function canSee(s,x,y){const map=localMap(s);return map?localSight(s,map,s.player.local,x,y):!s.player.local&&Math.max(Math.abs(x-s.player.x),Math.abs(y-s.player.y))<=phaseAt(s.time).region&&!!cell(s,x,y);}
+export function refreshSight(s){if(s.player.local)revealLocal(s);else reveal(s);}
+export function revealLocal(s) {const map=localMap(s);if(!map)return;for(let y=0;y<map.h;y++)for(let x=0;x<map.w;x++)if(canSee(s,x,y))map.seen[key(x,y)]=true;}
 export function enter(s, raw) {
   const parent=s.player.local?clone(s.player.local):null;assert(!parent||(localMap(s)?.kind==='field'&&localMap(s).portals.some(p=>p.kind==='building'&&p.x===parent.x&&p.y===parent.y)),'请走到地块内的建筑入口');const c=cell(s);assert(c.site,'此处没有可进入建筑');
   if(!s.locals[c.site.id]){assert(raw,'需要先生成建筑布局');s.locals[c.site.id]=validateLocal(raw,c.site.size??'normal');}
@@ -137,7 +137,7 @@ export function move(s,x,y) {
 }
 export function adjacent(s,x,y) {const p=s.player.local;return p&&Math.abs(p.x-x)+Math.abs(p.y-y)===1;}
 export function door(s,x,y) {const map=localMap(s),k=key(x,y);assert(map&&Object.hasOwn(map.doors,k)&&adjacent(s,x,y),'请先走到门的相邻位置');map.doors[k]=!map.doors[k];tick(s,1);revealLocal(s);log(s,map.doors[k]?'打开了门。':'关上了门。');}
-export function leave(s){const map=localMap(s);assert(map&&s.player.local.x===map.exit.x&&s.player.local.y===map.exit.y,'需要先走到区域出入口');tick(s,1);s.player.local=s.player.local.parent??null;revealLocal(s);log(s,s.player.local?'返回周边地块。':'返回区域地图。');}
+export function leave(s){const map=localMap(s);assert(map&&s.player.local.x===map.exit.x&&s.player.local.y===map.exit.y,'需要先走到区域出入口');tick(s,1);s.player.local=s.player.local.parent??null;refreshSight(s);log(s,s.player.local?'返回周边地块。':'返回区域地图。');}
 export function searchContainer(s,x,y,raw){const c=localMap(s)?.containers[key(x,y)];assert(c&&!c.resourceId&&adjacent(s,x,y),'请先走到容器的相邻位置');assert(!c.searched,'该容器已经搜索过');const loot=validateLoot(raw);c.searched=true;c.items=loot.items;c.description=loot.description;tick(s,10);log(s,`搜索${c.name}：${loot.description}`);}
 export function take(s,x,y,id,qty=1){const c=localMap(s)?.containers[key(x,y)];assert(c?.searched&&!c.resourceId&&adjacent(s,x,y),'需要在已搜索的容器旁');transfer(c.items,s.bag,id,qty);log(s,`拿取${ITEMS[id].name} ×${qty}。`);}
 export function transfer(from,to,id,qty,limit=20){assert(Object.hasOwn(ITEMS,id)&&Number.isInteger(qty)&&qty>0&&(from[id]??0)>=qty,'物品数量不足');assert(weight(to)+ITEMS[id].weight*qty<=limit,'背包负重超过 20 kg');from[id]-=qty;to[id]=(to[id]??0)+qty;}
@@ -146,8 +146,8 @@ export function campTransfer(s,id,toCamp){const c=cell(s);assert(c.camp&&!s.play
 export function build(s,recipe){assert(Object.hasOwn(RECIPES,recipe)&&!s.player.local,'请在区域地图上选择建设');const c=cell(s),r=RECIPES[recipe];assert(c.terrain!== 'w','不能在水中建设');assert(recipe==='shelter'?!c.camp:c.camp?.level===1,'当前营地不符合建设条件');for(const [id,q]of Object.entries(r.cost))assert((s.bag[id]??0)>=q,`缺少${ITEMS[id].name}，需要 ${q}`);for(const[id,q]of Object.entries(r.cost))s.bag[id]-=q;tick(s,r.minutes);c.camp??={level:0,storage:{}};c.camp.level++;log(s,`完成${r.name}。`);}
 export function rest(s){const level=!s.player.local?cell(s).camp?.level??0:0;tick(s,60,0);s.stats.stamina=Math.min(100,s.stats.stamina+15+level*12);if(level&&s.stats.food>20&&s.stats.water>20)s.stats.health=Math.min(100,s.stats.health+level*4);log(s,`休息一小时${level?'，庇护所改善了恢复效果':''}。`);}
 export function survey(s,raw){assert(!s.player.local,'请在区域地图探索');const c=cell(s);assert(!c.depleted,'本格的首轮可采集资源已耗尽');assert(!c.resources,'本格应通过共享资源记录采集');const loot=validateLoot(raw);assert(weight(s.bag)+weight(loot.items)<=20,'背包空间不足，请先存放物品');for(const[id,q]of Object.entries(loot.items))s.bag[id]=(s.bag[id]??0)+q;c.surveyed=true;c.depleted=true;tick(s,25);log(s,`探索${c.name}：${loot.description}`);}
-export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,environment:knownEnvironment(s.world.environment),time:formatTime(s.time),weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,localKind:map?.kind??(map?'building':null),localName:map?.name??c.site?.name??null,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},status:Object.fromEntries(Object.entries(s.stats).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visited:c.visited,naturalPoint:c.poi?.kind??null})),visibleResources:map?.kind?Object.values(map.containers).filter(o=>map.seen[key(o.x,o.y)]).map(o=>({name:o.name,x:o.x,y:o.y,remaining:c.resources.nodes[o.resourceId].remaining,item:RESOURCES[o.kind].item})):[],visibleObjects:map&&!map.kind?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
-export function formatTime(t){return `第 ${Math.floor(t/1440)+1} 天 · ${String(Math.floor(t%1440/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;}
+export function knownContext(s){if(!s)return '';const c=cell(s),map=localMap(s);return JSON.stringify({world:s.world.name,worldPosition:{x:s.atlas?.x??0,y:s.atlas?.y??0},regionSize:s.world.size,environment:knownEnvironment(s.world.environment),time:formatTime(s.time),phase:phaseAt(s.time).name,sight:{region:phaseAt(s.time).region,local:map?(map.kind==='cave'?2:phaseAt(s.time).local):null,note:'室内无采光位置仅两格；地图记忆不等于实时视野'},weather:s.weather,position:{x:s.player.x,y:s.player.y,location:c.name,localKind:map?.kind??(map?'building':null),localName:map?.name??c.site?.name??null,roomPosition:s.player.local?{x:s.player.local.x,y:s.player.local.y}:null},status:Object.fromEntries(Object.entries(s.stats).map(([k,v])=>[k,Math.round(v*10)/10])),inventory:s.bag,camp:c.camp,nearby:Object.values(s.world.cells).filter(c=>c.known&&Math.abs(c.x-s.player.x)<=2&&Math.abs(c.y-s.player.y)<=2).map(c=>({x:c.x,y:c.y,name:c.name,visible:regionVisible(s,c.x,c.y),visited:c.visited,naturalPoint:c.poi?.kind??null})),visibleResources:map?.kind?Object.values(map.containers).filter(o=>map.seen[key(o.x,o.y)]&&canSee(s,o.x,o.y)).map(o=>({name:o.name,x:o.x,y:o.y,remaining:c.resources.nodes[o.resourceId].remaining,item:RESOURCES[o.kind].item})):[],visibleObjects:map&&!map.kind?Object.values(map.containers).filter(c=>map.seen[key(c.x,c.y)]&&canSee(s,c.x,c.y)).map(c=>({name:c.name,x:c.x,y:c.y,searched:c.searched,...(c.searched?{items:c.items}:{})})):[],clues:s.clues.filter(c=>!c.revoked).slice(-10).map(c=>({kind:c.kind,title:c.title,detail:c.detail,x:c.x,y:c.y,source:c.sourceName})),recent:s.log.slice(-5).map(e=>e.text)});}
+export function formatTime(t){return `第 ${Math.floor(t/1440)+1} 天 · ${phaseAt(t).name} · ${String(Math.floor(t%1440/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;}
 export function validateSave(s){
   if(s?.version===1){s.version=2;s.atlas={x:0,y:0,regions:{}};s.world.sizeClass='small';for(const c of Object.values(s.world.cells))if(c.site)c.site.size??='normal';}
   const inspect=(v,depth=0)=>{assert(depth<20,'存档嵌套过深');if(v&&typeof v==='object')for(const[k,n]of Object.entries(v)){assert(!['__proto__','constructor','prototype'].includes(k),'存档包含非法字段');inspect(n,depth+1);}};inspect(s);

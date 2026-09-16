@@ -1,4 +1,4 @@
-import {TERRAINS,key,cell,localMap,visible} from './engine.js';
+import {TERRAINS,key,cell,localMap,canSee,regionVisible,phaseAt} from './engine.js';
 import {RESOURCES} from './field-data.js';
 import {randomAt} from './environment.js';
 
@@ -60,8 +60,9 @@ export function paintMap(canvas,s,{pan,selection,mapLevel}){
   const neighbor=(x,y)=>cell(s,x,y)?.known?cell(s,x,y).terrain:null;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     g.save();g.translate(ox+x*unit,oy+y*unit);g.scale(unit,unit);g.beginPath();g.rect(0,0,1,1);g.clip();const c=map?null:cell(s,x,y),known=map?map.seen[key(x,y)]:c.known;
-    if(!known)fog(g,x,y,s.seed);else if(map){if(map.kind)outdoor(g,s,map,x,y);else indoor(g,map,x,y);if(!visible(map,s.player.local,x,y)){g.fillStyle='#47584366';g.fillRect(0,0,1,1);}}
-    else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);}
+    if(!known)fog(g,x,y,s.seed);else if(map){if(map.kind)outdoor(g,s,map,x,y);else indoor(g,map,x,y);if(!canSee(s,x,y)){g.fillStyle='#26364c99';g.fillRect(0,0,1,1);}}
+    else {terrain(g,c.terrain,x,y,s.seed,neighbor);if(c.site)roof(g,c.site.size==='large');else if(c.poi)pointArt(g,c.poi.kind);if(c.camp)camp(g);if(!regionVisible(s,x,y)){g.fillStyle='#26364c77';g.fillRect(0,0,1,1);}}
+    if(known&&(map?canSee(s,x,y):regionVisible(s,x,y))&&phaseAt(s.time).local<=4){g.fillStyle=phaseAt(s.time).local===2?'#24345944':'#bb885322';g.fillRect(0,0,1,1);}
     g.strokeStyle='#59694d12';g.lineWidth=.008;g.strokeRect(0,0,1,1);
     if(!map&&s.clues.some(c=>!c.revoked&&c.x===x&&c.y===y))ellipse(g,.84,.16,.07,.07,'#b68b42');
     if(selection?.x===x&&selection?.y===y){g.strokeStyle='#f8edc6';g.lineWidth=.07;g.strokeRect(.045,.045,.91,.91);g.strokeStyle='#58764f';g.lineWidth=.025;g.strokeRect(.045,.045,.91,.91);}g.restore();

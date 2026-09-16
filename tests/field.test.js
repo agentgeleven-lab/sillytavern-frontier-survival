@@ -56,7 +56,7 @@ test('capacity failure does not deduct resources or time, crafting conserves mat
 });
 test('hidden resource quantities stay out of chat and visible depleted nodes stay explicit',()=>{
   const s=game();F.ensureResources(s);assert.deepEqual(JSON.parse(E.knownContext(s)).visibleResources,[]);F.enterField(s,F.demoField(s));const m=E.localMap(s);m.seen={};assert.deepEqual(JSON.parse(E.knownContext(s)).visibleResources,[]);
-  const o=Object.values(m.containers)[0];m.seen[E.key(o.x,o.y)]=true;E.cell(s).resources.nodes[o.resourceId].remaining=0;const known=JSON.parse(E.knownContext(s));assert.equal(known.visibleResources.length,1);assert.equal(known.visibleResources[0].remaining,0);assert.deepEqual(known.visibleObjects,[]);
+  const o=Object.values(m.containers)[0];s.player.local.x=o.x;s.player.local.y=o.y+1;m.seen[E.key(o.x,o.y)]=true;E.cell(s).resources.nodes[o.resourceId].remaining=0;const known=JSON.parse(E.knownContext(s));assert.equal(known.visibleResources.length,1);assert.equal(known.visibleResources[0].remaining,0);assert.deepEqual(known.visibleObjects,[]);
 });
 test('chat discovery retains a clue without invalidating an already generated parcel',()=>{
   const s=game();F.enterField(s,F.demoField(s));const before=JSON.stringify(s.locals);

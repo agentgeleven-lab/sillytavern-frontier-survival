@@ -34,7 +34,7 @@ test('natural location collisions, invalid habitat and artificial terrain are re
 });
 test('fog-safe world thumbnails and chat context exclude hidden natural locations',()=>{
  const s=game(),hidden=Object.values(s.world.cells).find(c=>!c.known);hidden.poi={id:'secret',kind:'cave',name:'SECRET_CAVE',description:'HIDDEN'};hidden.name='SECRET_CAVE';W.summarizeRegion(s);
- const a=s.atlas.regions['0,0'];assert.equal(a.thumbnail.join('').replaceAll('?','').length,9);assert(!a.landmarks.some(p=>p.x===hidden.x&&p.y===hidden.y));assert(!E.knownContext(s).includes('SECRET_CAVE'));
+ const a=s.atlas.regions['0,0'];assert.equal(a.thumbnail.join('').replaceAll('?','').length,25);assert(!a.landmarks.some(p=>p.x===hidden.x&&p.y===hidden.y));assert(!E.knownContext(s).includes('SECRET_CAVE'));
  assert.equal(JSON.parse(E.knownContext(s)).environment.biome,s.world.environment.biome);
 });
 test('natural resources collect once and regional persistence includes habitat and depletion',()=>{
