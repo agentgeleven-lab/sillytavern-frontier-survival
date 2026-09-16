@@ -1,3 +1,4 @@
+import {knownWildlife,SPECIES} from './wildlife.js';
 import {TERRAINS,key,cell,localMap,canSee,regionVisible,phaseAt} from './engine.js';
 import {artificialLight} from './daylight.js';
 import {fireRemaining} from './lighting-data.js';
@@ -71,6 +72,7 @@ export function paintMap(canvas,s,{pan,selection,mapLevel}){
     if(!map&&s.clues.some(c=>!c.revoked&&c.x===x&&c.y===y))ellipse(g,.84,.16,.07,.07,'#b68b42');
     if(selection?.x===x&&selection?.y===y){g.strokeStyle='#f8edc6';g.lineWidth=.07;g.strokeRect(.045,.045,.91,.91);g.strokeStyle='#58764f';g.lineWidth=.025;g.strokeRect(.045,.045,.91,.91);}g.restore();
   }
+  if(map){for(const a of knownWildlife(s).visible){g.save();g.translate(ox+a.x*unit,oy+a.y*unit);g.scale(unit,unit);const def=SPECIES[a.species];ellipse(g,.5,.7,.28,.1,'#253a3433');if(a.state==='尸体'){path(g,[[.24,.3],[.76,.7]],null,'#72594b');path(g,[[.76,.3],[.24,.7]],null,'#72594b');}else{ellipse(g,.48,.54,.23,.14,def.color);ellipse(g,.7,.43,.12,.11,def.color);g.strokeStyle=def.color;g.lineWidth=.045;for(const x of [.32,.57]){g.beginPath();g.moveTo(x,.59);g.lineTo(x,.76);g.stroke();}path(g,[[.65,.35],[.66,.19],[.76,.36]],def.color);if(a.species==='rabbit')path(g,[[.73,.35],[.83,.12],[.81,.4]],def.color);if(a.species==='deer'){path(g,[[.67,.32],[.59,.12],[.56,.2]],null,def.color);path(g,[[.7,.3],[.77,.12],[.8,.19]],null,def.color);}if(a.species==='bat'){path(g,[[.5,.45],[.13,.19],[.19,.59],[.5,.61],[.87,.59],[.9,.19]],def.color);}}g.restore();}}
   marker(g,ox+(p.x+.5)*unit,oy+(p.y+.5)*unit,Math.max(5,unit*.15));
   g.fillStyle='#66765c';g.font='10px monospace';g.textAlign='center';for(let x=0;x<w;x++)g.fillText(String(x),ox+(x+.5)*unit,oy-8);for(let y=0;y<h;y++)g.fillText(String(y),ox-13,oy+(y+.55)*unit);
   return {unit,ox,oy};
