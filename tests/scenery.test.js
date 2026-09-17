@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {environmentAt,SCENERIES,sceneryOf,validateEnvironment,noise} from '../src/environment.js';
+import {fixedRegionSpec,demoRegion,validateRegion,summarizeRegion} from '../src/world.js';
+import * as E from '../src/engine.js';
+import {fieldConstraints} from '../src/field-data.js';
+test('cold regions offer forest and meadow as well as sparse snowfields',()=>{const styles=new Set();let snow=0,oldSnow=0,total=0;for(let y=-70;y<=70;y++)for(let x=-70;x<=70;x++){const e=environmentAt('testing',x,y);validateEnvironment(e);styles.add(e.scenery);snow+=e.biome==='tundra';oldSnow+=noise('testing:heat',x,y,24)<.25&&noise('testing:height',x,y,9)>=.2&&noise('testing:height',x,y,9)<=.77;total++;}assert.deepEqual([...styles].sort(),Object.keys(SCENERIES).sort());assert(snow<oldSnow);assert(snow/total<.1);});
+test('subtype is fixed by seed and legacy saved environments remain valid without migration',()=>{const e=environmentAt('landscape',2,3);assert.deepEqual(environmentAt('landscape',2,3),e);delete e.scenery;const before=structuredClone(e);validateEnvironment(e);assert(SCENERIES[sceneryOf(e)]);assert.deepEqual(e,before);assert.throws(()=>validateEnvironment({...e,scenery:'bad'}));});
+test('new scenery constraints reach local generation and persist in region summaries',()=>{const s=E.newGame(E.demoWorld(),{seed:'landscape',mode:'demo'}),spec=fixedRegionSpec(s,0,0);s.world=validateRegion(demoRegion(spec),spec);s.player.x=s.player.y=Math.floor(s.world.size/2);E.reveal(s);summarizeRegion(s);assert.equal(s.atlas.regions['0,0'].environment.scenery,s.world.environment.scenery);assert.equal(fieldConstraints(s,E.cell(s)).scenery,SCENERIES[s.world.environment.scenery]);E.validateSave(s);});
+test('new generation keeps borders inherited from previously explored regions',()=>{const s=E.newGame(E.demoWorld(),{seed:'legacy',mode:'demo'});summarizeRegion(s);const before=structuredClone(s.world),spec=fixedRegionSpec(s,1,0);validateRegion(demoRegion(spec),spec);assert(spec.edges.west.inherited);assert.deepEqual(s.world,before);});

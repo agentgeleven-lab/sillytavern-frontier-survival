@@ -1,5 +1,5 @@
 import {timeFrozen} from './developer-data.js';
-import {environmentAt,habitatFor,noise,NATURAL_POINTS,BIOMES,LAND_USE} from './environment.js';
+import {environmentAt,habitatFor,noise,sceneryName,NATURAL_POINTS,BIOMES,LAND_USE} from './environment.js';
 import {stepMinutes,assert,key,hash,seeded,validateWorld,cell,flood,pathfind,tick,reveal,log,clone,validateSave} from './engine.js';
 import {REGION_SIZES} from './layout.js';
 export const DIRECTIONS={north:{dx:0,dy:-1,opposite:'south',name:'北'},east:{dx:1,dy:0,opposite:'west',name:'东'},south:{dx:0,dy:1,opposite:'north',name:'南'},west:{dx:-1,dy:0,opposite:'east',name:'西'}};
@@ -89,10 +89,11 @@ export function demoRegion(spec){
   const grid=Array.from({length:n},(_,y)=>Array.from({length:n},(_,x)=>{
     const v=noise(spec.seed,x,y,4);
     if(e.biome==='wetland')return v>.62?'w':v>.4?'m':'.';
-    if(e.biome==='mountain')return v>.27?'h':'.';
+    if(e.biome==='mountain')return v>(e.scenery==='hills'?.5:.27)?'h':v<.17?'f':'.';
     if(e.biome==='forest'||e.biome==='rainforest')return v<.75?'f':'.';
     if(e.biome==='grassland')return v>.7?'f':'.';
     if(e.biome==='coast')return x>n*.73?'w':v>.4?'s':'.';
+    if(e.biome==='tundra')return v<.2?'h':v<.4?'.':'n';
     return e.baseTerrain;
   }));
   if(settled)for(let y=1;y<n-1;y++)for(let x=1;x<n-1;x++)if(grid[y][x]!=='w'){
@@ -110,8 +111,8 @@ export function demoRegion(spec){
   const count=e.buildingRange[0]+Math.floor(r()*(e.buildingRange[1]-e.buildingRange[0]+1));
   const names=e.landUse==='rural'?['农舍','谷仓','磨坊','牧场仓房']:e.landUse==='industrial'?['厂房','仓储楼','值班室','维修车间']:['街角商店','住宅','旧仓库','诊所','车库','办公楼'];
   for(const c of candidates){if(sites.length>=count)break;if(!connected.has(key(c.x,c.y))||occupied.has(key(c.x,c.y)))continue;const i=sites.length;sites.push({...c,name:names[i%names.length]+(i>=names.length?` ${i+1}`:''),kind:names[i%names.length],size:i===0?'normal':i%3===1?'small':'large',description:`${e.condition}的${names[i%names.length]}，沿道路留有入口。`});occupied.add(key(c.x,c.y));}
-  for(const c of candidates){if(points.length>=Math.max(3,Math.floor(n/3)))break;if(!connected.has(key(c.x,c.y))||occupied.has(key(c.x,c.y)))continue;const kind=e.allowedPoints[points.length%e.allowedPoints.length];points.push({...c,kind,name:NATURAL_POINTS[kind],description:`${BIOMES[e.biome]}中的${NATURAL_POINTS[kind]}。可以靠近调查，寻找自然材料或补给。`});occupied.add(key(c.x,c.y));}
-  return {name:`${BIOMES[e.biome]}${settled?LAND_USE[e.landUse]:'边境'} ${spec.x},${spec.y}`,description:`${e.climate}的${BIOMES[e.biome]}。${settled?'聚落与周围自然环境相接。':'这里没有人类建筑，沿自然地势寻找落脚点与资源。'}`,terrain:grid.map(row=>row.join('')),sites,points};
+  for(const c of candidates){if(points.length>=Math.max(3,Math.floor(n/3)))break;if(!connected.has(key(c.x,c.y))||occupied.has(key(c.x,c.y)))continue;const kind=e.allowedPoints[points.length%e.allowedPoints.length];points.push({...c,kind,name:NATURAL_POINTS[kind],description:`${sceneryName(e)}中的${NATURAL_POINTS[kind]}。可以靠近调查，寻找自然材料或补给。`});occupied.add(key(c.x,c.y));}
+  return {name:`${sceneryName(e)}${settled?LAND_USE[e.landUse]:'边境'} ${spec.x},${spec.y}`,description:`${e.climate}的${sceneryName(e)}。${settled?'聚落与周围自然环境相接。':'这里没有人类建筑，沿自然地势寻找落脚点与资源。'}`,terrain:grid.map(row=>row.join('')),sites,points};
 }
 export function naturalLoot(c){
   const kind=c.poi?.kind;

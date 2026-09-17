@@ -5,9 +5,9 @@ export const NATURAL_POINTS={clearing:'林间空地',spring:'泉眼',berries:'�
 export function randomAt(seed,x,y){let h=2166136261;for(const c of `${seed}:${x},${y}`)h=Math.imul(h^c.charCodeAt(0),16777619);h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;h=Math.imul(h,0x846ca68b);return ((h^(h>>>16))>>>0)/4294967296;}
 export function noise(seed,x,y,scale=8){const ax=Math.floor(x/scale),ay=Math.floor(y/scale),u=x/scale-ax,v=y/scale-ay,s=u*u*(3-2*u),t=v*v*(3-2*v),a=randomAt(seed,ax,ay),b=randomAt(seed,ax+1,ay),c=randomAt(seed,ax,ay+1),d=randomAt(seed,ax+1,ay+1);return (a+(b-a)*s)*(1-t)+(c+(d-c)*s)*t;}
 export function environmentAt(seed,x,y,theme='waste'){
-  const heat=noise(seed+':heat',x,y,24),moisture=noise(seed+':rain',x,y,11),height=noise(seed+':height',x,y,9);
+  const heat=noise(seed+':heat',x,y,10),moisture=noise(seed+':rain',x,y,6),height=noise(seed+':height',x,y,6);
   const climate=heat<.25?'寒冷':heat>.7?(moisture<.4?'干旱':'热带'):'温带';
-  const biome=height>.77?'mountain':height<.2?'coast':climate==='寒冷'?'tundra':climate==='干旱'?'desert':climate==='热带'?'rainforest':moisture>.7?'wetland':moisture>.43?'forest':'grassland';
+  const biome=height>.64?'mountain':height<.2?'coast':climate==='寒冷'?(heat<.13?'tundra':moisture>.4?'forest':'grassland'):climate==='干旱'?'desert':climate==='热带'?'rainforest':moisture>.7?'wetland':moisture>.43?'forest':'grassland';
   // Sparse anchors produce a settlement core, outskirts and rural fringe.
   let landUse='wilderness',distance=Infinity,anchor=null;
   const mx=Math.floor(x/16),my=Math.floor(y/16);
@@ -25,10 +25,14 @@ export function environmentAt(seed,x,y,theme='waste'){
   const baseTerrain={forest:'f',rainforest:'f',grassland:'.',wetland:'m',mountain:'h',coast:'s',desert:'s',tundra:'n'}[biome];
   const allowedPoints={forest:['grove','berries','clearing'],rainforest:['grove','spring','clearing'],grassland:['berries','clearing','spring'],wetland:['reeds','grove','spring'],mountain:['cave','overlook','spring'],coast:['driftwood','overlook','spring'],desert:['cave','overlook','spring'],tundra:['grove','overlook','cave']}[biome];
   const allowedTerrains={forest:'f.hwm',rainforest:'f.wmh',grassland:'.fhwm',wetland:'mw.f',mountain:'h.fw',coast:'sw.fh',desert:'sh.w',tundra:'nhw.'}[biome]+(natural?'':'rau');
-  return {version:1,climate,biome,landUse,condition,baseTerrain,allowedTerrains,moisture:Math.round(moisture*100),elevation:Math.round(height*100),buildingRange:{wilderness:[0,0],rural:[1,4],town:[4,8],suburb:[4,9],city:[8,16],industrial:[3,7]}[landUse],allowedPoints};
+  const scenery=biome==='forest'?(climate==='寒冷'?'taiga':'broadleaf'):biome==='grassland'?(climate==='寒冷'?'coldmeadow':'meadow'):biome==='mountain'?(height<.77?'hills':climate==='寒冷'?'alpine':'crags'):biome==='coast'?(moisture<.45?'sandcoast':'rockcoast'):biome==='wetland'?'marsh':biome==='rainforest'?'jungle':biome==='desert'?'dunes':'snowfield';
+  return {version:1,scenery,climate,biome,landUse,condition,baseTerrain,allowedTerrains,moisture:Math.round(moisture*100),elevation:Math.round(height*100),buildingRange:{wilderness:[0,0],rural:[1,4],town:[4,8],suburb:[4,9],city:[8,16],industrial:[3,7]}[landUse],allowedPoints};
 }
-export const environmentLabel=e=>e?`${e.climate} · ${BIOMES[e.biome]} · ${LAND_USE[e.landUse]}`:'原有区域';
-export const knownEnvironment=e=>e?{climate:e.climate,biome:e.biome,landUse:e.landUse,condition:e.condition}:null;
+export const SCENERIES={taiga:'寒带针叶林',broadleaf:'温带阔叶林',coldmeadow:'寒冷草甸',meadow:'温带草原',hills:'起伏丘陵',alpine:'高山雪岭',crags:'裸岩山地',sandcoast:'沙滩海岸',rockcoast:'岩岸海湾',marsh:'芦苇湿地',jungle:'热带雨林',dunes:'沙丘荒漠',snowfield:'苔原雪地'};
+export const sceneryOf=e=>e?.scenery??({forest:e?.climate==='寒冷'?'taiga':'broadleaf',grassland:e?.climate==='寒冷'?'coldmeadow':'meadow',mountain:e?.climate==='寒冷'?'alpine':'crags',coast:'sandcoast',wetland:'marsh',rainforest:'jungle',desert:'dunes',tundra:'snowfield'}[e?.biome]??'meadow');
+export const sceneryName=e=>SCENERIES[sceneryOf(e)];
+export const environmentLabel=e=>e?`${e.climate} · ${sceneryName(e)} · ${LAND_USE[e.landUse]}`:'原有区域';
+export const knownEnvironment=e=>e?{climate:e.climate,biome:e.biome,scenery:sceneryName(e),landUse:e.landUse,condition:e.condition}:null;
 export function habitatFor(e){return {version:1,habitat:{biome:e.biome,climate:e.climate,waterAvailability:e.moisture,humanDisturbance:e.landUse==='wilderness'?'low':'high'},entities:{}};}
-export function validateEnvironment(e){if(!e||e.version!==1||!Object.hasOwn(BIOMES,e.biome)||!Object.hasOwn(LAND_USE,e.landUse)||!['寒冷','干旱','热带','温带'].includes(e.climate))throw Error('环境资料无效');}
+export function validateEnvironment(e){if(!e||e.version!==1||e.scenery!==undefined&&!Object.hasOwn(SCENERIES,e.scenery)||!Object.hasOwn(BIOMES,e.biome)||!Object.hasOwn(LAND_USE,e.landUse)||!['寒冷','干旱','热带','温带'].includes(e.climate))throw Error('环境资料无效');}
 export function validateEcology(e){if(!e||e.version!==1||!e.habitat||!Object.hasOwn(BIOMES,e.habitat.biome)||!e.entities||Array.isArray(e.entities))throw Error('栖息地资料无效');if(Object.keys(e.entities).length)throw Error('当前版本尚不支持生物实体');}

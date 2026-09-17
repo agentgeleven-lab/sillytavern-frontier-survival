@@ -1,10 +1,10 @@
-import {randomAt} from './environment.js';
+import {randomAt,sceneryName} from './environment.js';
 export const RESOURCES={herb:{name:'野生草药',item:'herb',art:'reeds',minutes:8},vegetables:{name:'可食野菜',item:'vegetables',art:'reeds',minutes:6},grain:{name:'残留谷物',item:'grain',art:'reeds',minutes:8},berries:{name:'浆果灌木',item:'berries',art:'berries',minutes:6},deadwood:{name:'倒木与枯枝',item:'wood',art:'grove',minutes:8},stone:{name:'松散石块',item:'stone',art:'stone',minutes:8},fiber:{name:'纤维植物',item:'fiber',art:'reeds',minutes:6}};
 const check=(v,m)=>{if(!v)throw Error(m);};
 export function parcelSpec(s,c,zone='field'){
   const seed=`${s.seed}:parcel:${s.atlas.x},${s.atlas.y}:${c.x},${c.y}:${zone}`;
   const size=['small','normal','large'][Math.floor(randomAt(seed,0,0)*3)],dimension={small:11,normal:19,large:29}[size];
-  return {id:`${zone}-${c.x}-${c.y}`,size,dimension,zone,seed,owner:{x:c.x,y:c.y},name:zone==='cave'?`${c.name} · 洞穴深处`:`${c.name} · 周边地块`,terrain:c.terrain};
+  return {id:`${zone}-${c.x}-${c.y}`,size,dimension,zone,seed,owner:{x:c.x,y:c.y},name:zone==='cave'?`${c.name} · 洞穴深处`:`${c.name} · 周边地块`,terrain:c.terrain,scenery:sceneryName(s.world.environment)};
 }
 export function initialResources(s,c,version=3){
   const nodes={};
