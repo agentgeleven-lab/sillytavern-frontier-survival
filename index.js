@@ -1,6 +1,5 @@
 import {durableAction} from './src/durable.js';
 import {visibleNpcs} from './src/encounter-data.js';
-import {distance} from './src/combat-data.js';
 import {encounterAction} from './src/encounters.js';
 import {salvageAction} from './src/salvage.js';
 import {eventAction} from './src/events.js';
@@ -83,7 +82,7 @@ export function initialize(){
     await store.run(async(s,signal,transaction)=>{
       if(['devToggle','devGrant','devStats','devRestore','devClearWounds','devAdvance'].includes(type)){developerAction(s,type,p);return;}
       if(['craftClothes','equipClothes','unequipClothes','repairDurable'].includes(type)){durableAction(s,type,p);return;}
-      if(type==='npcChat'){const a=visibleNpcs(s).find(a=>a.id===p.id);E.assert(!s.ended&&a?.hp>0&&!a.hostile&&distance(a,s.player.local)<=1,'请靠近可交流的人物');const message=E.text(p.message,600);E.assert(message,'请输入要说的话');const raw=s.mode==='demo'?{reply:'我也在寻找补给。留意周围的动静，有事就在这里说。'}:await validatedRequest('npc',{background:s.background,npc:{name:a.name,kind:a.kind,hp:a.hp,trust:a.trust},known:JSON.parse(E.knownContext(s)),message},r=>{E.assert(E.text(r?.reply,600),'对话不能为空');return r;},signal);E.tick(s,2,0);if(!s.ended)E.log(s,`${a.name}：${E.text(raw.reply,600)}`);return;}
+      if(type==='npcChat'){const a=visibleNpcs(s).find(a=>a.id===p.id);E.assert(!s.ended&&a?.hp>0&&!a.hostile&&E.interactionDistance(s,a.x,a.y)<=1,'请靠近可交流的人物');const message=E.text(p.message,600);E.assert(message,'请输入要说的话');const raw=s.mode==='demo'?{reply:'我也在寻找补给。留意周围的动静，有事就在这里说。'}:await validatedRequest('npc',{background:s.background,npc:{name:a.name,kind:a.kind,hp:a.hp,trust:a.trust},known:JSON.parse(E.knownContext(s)),message},r=>{E.assert(E.text(r?.reply,600),'对话不能为空');return r;},signal);E.tick(s,2,0);if(!s.ended)E.log(s,`${a.name}：${E.text(raw.reply,600)}`);return;}
       if(['npcAttack','npcTalk','npcAid','npcTrade','npcLoot','guard','escape'].includes(type)){encounterAction(s,type,p);return;}
       if(['dismantleItem','dismantle','packFurniture','deployFurniture'].includes(type)){salvageAction(s,type,p);return;}
       if(type==='investigateEvent'){eventAction(s,p);return;}
@@ -172,7 +171,8 @@ export function initialize(){
     if(reconcileSources(draft,messages))store.run(()=>draft).catch(e=>ui.setStatus(e.message,true));
   }
   const actions={create,act,background,cardFile:raw=>{E.assert(raw.length<3000000,'角色卡文件过大');return cardBackground(JSON.parse(raw));},
-    import:raw=>store.import(raw),revoke:id=>store.run(s=>{revokeClue(s,id);}),clue:data=>store.run(s=>{manualClue(s,data);}),
+    loadSnapshot:async(slot,token)=>{queued.clear();clearTimeout(drainTimer);switchSerial++;return store.loadSnapshot(slot,token);},
+    import:raw=>{queued.clear();clearTimeout(drainTimer);switchSerial++;return store.import(raw);},revoke:id=>store.run(s=>{revokeClue(s,id);}),clue:data=>store.run(s=>{manualClue(s,data);}),
     context:()=>E.knownContext(store.state),preferences,savePreferences(){getContext()?.saveSettingsDebounced?.();pushContext();},
     async sync(){E.assert(getContext(),'未连接酒馆聊天');E.assert(store.state?.mode==='api','离线演示不调用聊天提取 API');const c=getContext();for(let i=Math.max(0,c.chat.length-4);i<c.chat.length;i++)queueMessage(i);ui.setStatus('已加入同步队列；只检查最近四条消息。');},
   };
@@ -191,7 +191,7 @@ export function initialize(){
   changeChat();
   const entry=document.createElement('div');entry.className='fs-settings-entry';const open=document.createElement('button');open.type='button';open.textContent='打开「边境 · 探索生存」';open.onclick=ui.open;entry.append(open);(document.querySelector('#extensions_settings2')??document.querySelector('#extensions_settings'))?.append(entry);
   instance={open:ui.open,destroy(){store.cancel();clearTimeout(drainTimer);queued.clear();for(const[t,fn]of bindings)ctx?.eventSource?.removeListener?.(t,fn);getContext()?.setExtensionPrompt?.(PROMPT_KEY,'',1,0,false);ui.destroy();entry.remove();instance=null;delete globalThis.FrontierSurvival;}};
-  globalThis.FrontierSurvival={open:ui.open,version:'0.26.0',getKnownContext:()=>E.knownContext(store.state)};
+  globalThis.FrontierSurvival={open:ui.open,version:'0.27.0',getKnownContext:()=>E.knownContext(store.state)};
   if(!ctx)ui.open();if(hostWarning)ui.setStatus(hostWarning,true);return instance;
 }
 const ctx=getContext();

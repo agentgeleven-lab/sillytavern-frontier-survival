@@ -12,8 +12,8 @@ import {randomAt} from './environment.js';
 import {fireRemaining} from './lighting-data.js';
 import {RETALIATION,SCARE_CHANCE,HUNT_ACTIONS,corpseAge,corpseFreshness} from './hunting-data.js';
 function wearCutting(s){const id=Object.keys(s.bag).find(id=>s.bag[id]>0&&DURABLE[id]?.condition>0&&['tool','stoneknife'].includes(DURABLE[id].base));wearItem(s,id);}
-export function selectedAnimal(s,id){const m=E.localMap(s),a=m?.wildlife?.animals.find(a=>a.id===id);E.assert(a&&E.canSee(s,a.x,a.y),'目标已不在当前视野内，请重新选择');return {m,a,distance:Math.abs(s.player.local.x-a.x)+Math.abs(s.player.local.y-a.y)};}
-export function cookingReady(s){const m=E.localMap(s),f=m?.fire,p=s.player.local;return !!(f&&p&&Math.abs(p.x-f.x)+Math.abs(p.y-f.y)<=1&&f.lit&&fireRemaining(s,f)>=(timeFrozen(s)?1:10));}
+export function selectedAnimal(s,id){const m=E.localMap(s),a=m?.wildlife?.animals.find(a=>a.id===id);E.assert(a&&E.canSee(s,a.x,a.y),'目标已不在当前视野内，请重新选择');return {m,a,distance:E.interactionDistance(s,a.x,a.y)};}
+export function cookingReady(s){const m=E.localMap(s),f=m?.fire,p=s.player.local;return !!(f&&p&&E.interactionDistance(s,f.x,f.y)<=1&&f.lit&&fireRemaining(s,f)>=(timeFrozen(s)?1:10));}
 function enoughWeight(s,id){E.assert(E.weight(s.bag)+E.ITEMS[id].weight<=20,'背包空间不足，请先存放物品');}
 export function huntingAction(s,action,id){
  E.assert(!s.ended&&s.stats.health>0,'角色已无法行动');

@@ -1,3 +1,4 @@
+import {touching,doorTouch} from './interaction.js';
 export const CAMP_SIZE=15, CAMP_EXIT={x:7,y:14};
 export const CAMP_SIZES=[15,19,23,27];
 export const campSize=l=>l?.size??CAMP_SIZE;
@@ -13,9 +14,9 @@ export const footprint=o=>{const f=FURNITURE[o.type];return {w:o.rot?f.h:f.w,h:o
 export function tiles(o){const {w,h}=footprint(o);return Array.from({length:w*h},(_,i)=>({x:o.x+i%w,y:o.y+Math.floor(i/w)}));}
 export const campLayer=type=>['floor','roof'].includes(type)?type:'solid';
 export const objectAt=(l,x,y)=>l.objects.find(o=>!['floor','roof'].includes(o.type)&&tiles(o).some(p=>p.x===x&&p.y===y))??l.objects.find(o=>o.type==='floor'&&tiles(o).some(p=>p.x===x&&p.y===y));
-export const nearObject=(p,o)=>!!p&&tiles(o).some(t=>Math.abs(p.x-t.x)+Math.abs(p.y-t.y)<=1);
+export const nearObject=(p,o,l)=>!!p&&tiles(o).some(t=>{const blocked=(x,y)=>{const a=l&&objectAt(l,x,y);return !!a&&a.type!=='floor'&&!(a.type==='door'&&a.open);};return o.type==='door'&&l?doorTouch(p,t,blocked,(x,y)=>['wall','door'].includes(objectAt(l,x,y)?.type)):touching(p,t,blocked);});
 export const simpleCamp=s=>s.campMode==='simple'&&!!s.player.camp;
-export const canUseCampObject=(s,o)=>!!s.player.camp&&(simpleCamp(s)||nearObject(s.player.camp,o));
+export const canUseCampObject=(s,o)=>!!s.player.camp&&(simpleCamp(s)||nearObject(s.player.camp,o,campAt(s)?.layout));
 export const nearCampFacility=(s,type)=>!!s.player.camp&&!!campAt(s)?.layout?.objects.some(o=>o.type===type&&canUseCampObject(s,o));
 export function passable(l,x,y,doors=false){const n=campSize(l);if(x<0||y<0||x>=n||y>=n||(!x||!y||x===n-1||y===n-1)&&!(x===7&&y===n-1))return false;const o=objectAt(l,x,y);return !o||o.type==='floor'||o.type==='door'&&(o.open||doors);}
 export function campPath(l,from,to,doors=false){if(!passable(l,to.x,to.y,doors))return null;const q=[{...from,path:[]}],seen=new Set([`${from.x},${from.y}`]);for(let i=0;i<q.length;i++){const p=q[i];if(p.x===to.x&&p.y===to.y)return p.path;for(const[dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]]){const x=p.x+dx,y=p.y+dy,k=`${x},${y}`;if(!seen.has(k)&&passable(l,x,y,doors)){seen.add(k);q.push({x,y,path:[...p.path,{x,y}]});}}}return null;}

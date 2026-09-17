@@ -1,3 +1,4 @@
+import {localTouch} from './interaction.js';
 import {npcMinute,animalThreatTurn} from './encounter-data.js';
 import {changeSpirit,visibleDanger} from './spirit.js';
 import {stealth} from './equipment-data.js';
@@ -54,7 +55,7 @@ function canDetect(m,a,b){return sightLine(m,a,b.x,b.y,SPECIES[a.species].sight)
 function active(id,t){const phase=phaseAt(t).id,v=SPECIES[id].active;return v==='day'?['dawn','morning','afternoon','dusk'].includes(phase):v==='night'?['night','deepNight'].includes(phase):!['morning','afternoon'].includes(phase);}
 function nextStep(m,a,target,occupied){
  const queue=[{x:a.x,y:a.y,first:null}],seen=new Set([k(a.x,a.y)]);
- for(let i=0;i<queue.length&&i<1000;i++){const p=queue[i];if(dist(p,target)<=1)return p.first;for(const[dx,dy]of directions){const x=p.x+dx,y=p.y+dy,key=k(x,y);if(!seen.has(key)&&pass(m,x,y)&&!occupied(x,y)){seen.add(key);queue.push({x,y,first:p.first??{x,y}});}}}return null;
+ for(let i=0;i<queue.length&&i<1000;i++){const p=queue[i];if(localTouch(m,p,target))return p.first;for(const[dx,dy]of directions){const x=p.x+dx,y=p.y+dy,key=k(x,y);if(!seen.has(key)&&pass(m,x,y)&&!occupied(x,y)){seen.add(key);queue.push({x,y,first:p.first??{x,y}});}}}return null;
 }
 function minute(s,m,t,awake,present=true){
  npcMinute(s,m,t,present);const engaged=new Set((m.wildlife?.animals??[]).filter(a=>animalThreatTurn(s,m,a,t,present)).map(a=>a.id));
@@ -80,8 +81,8 @@ function minute(s,m,t,awake,present=true){
  if(a.state==='rest'){a.stamina=clamp(a.stamina+.4);continue;}
  if(a.state==='graze')a.hunger=clamp(a.hunger-.15);
  a.credit=Math.min(4,a.credit+(running?def.run:def.speed)/4);if(a.credit<1)continue;a.credit--;
- if(goal&&a.state==='eat'&&dist(a,goal)<=1){goal.meat=Math.max(0,goal.meat-1);a.hunger=clamp(a.hunger-35);continue;}
- if(goal&&a.state==='hunt'&&dist(a,goal)<=1){goal.hp=Math.max(0,goal.hp-1);a.stamina=clamp(a.stamina-2);if(!goal.hp){killAnimal(m,goal,t);a.state='eat';}continue;}
+ if(goal&&a.state==='eat'&&localTouch(m,a,goal)){goal.meat=Math.max(0,goal.meat-1);a.hunger=clamp(a.hunger-35);continue;}
+ if(goal&&a.state==='hunt'&&localTouch(m,a,goal)){goal.hp=Math.max(0,goal.hp-1);a.stamina=clamp(a.stamina-2);if(!goal.hp){killAnimal(m,goal,t);a.state='eat';}continue;}
  const occupied=(x,y)=>(m.encounters?.actors??[]).some(n=>n.x===x&&n.y===y)||w.animals.some(b=>b.id!==a.id&&b.x===x&&b.y===y)||(s.player.local&&s.locals[s.player.local.site]===m&&s.player.local.x===x&&s.player.local.y===y);
  let step=null;
  if(a.state==='flee'){step=directions.map(([dx,dy])=>({x:a.x+dx,y:a.y+dy})).filter(q=>pass(m,q.x,q.y)&&!occupied(q.x,q.y)).sort((u,v)=>dist(v,goal)-dist(u,goal))[0];if(step&&dist(step,goal)<dist(a,goal))step=null;}

@@ -1,3 +1,4 @@
+import {NEIGHBORS,localTouch,contactDistance} from './interaction.js';
 import {PACKED,validateSalvage} from './salvage.js';
 import {TRAP_ITEMS,validateTraps} from './traps.js';
 import {advanceEvents,eventDelay,activeEvents,validateEvents} from './events.js';
@@ -160,7 +161,7 @@ export function enter(s, raw) {
   const map=s.locals[c.site.id];s.player.local={site:c.site.id,...map.exit,...(parent?{parent}:{})};tick(s,1);revealLocal(s);log(s,`进入${c.site.name}。`);
 }
 export function localPath(s,x,y) {const map=localMap(s);if(!map)return null;return pathfind(s.player.local,{x,y},(a,b)=>map.seen[key(a,b)]&&'.+E'.includes(tileAt(map,a,b))&&(tileAt(map,a,b)!=='+'||map.doors[key(a,b)])&&(!map.containers[key(a,b)]||map.containers[key(a,b)].removed)&&!occupied(s,map,a,b,s.player.local));}
-export function approachPath(s,x,y){const map=localMap(s);if(!map||!map.seen[key(x,y)])return null;return [[1,0],[-1,0],[0,1],[0,-1]].map(([dx,dy])=>localPath(s,x+dx,y+dy)).filter(p=>p!==null).sort((a,b)=>a.length-b.length)[0]??null;}
+export function approachPath(s,x,y){const map=localMap(s);if(!map||!map.seen[key(x,y)])return null;return NEIGHBORS.filter(([dx,dy])=>localTouch(map,{x:x+dx,y:y+dy},{x,y})).map(([dx,dy])=>localPath(s,x+dx,y+dy)).filter(p=>p!==null).sort((a,b)=>a.length-b.length)[0]??null;}
 export function regionPath(s,x,y) {return pathfind(s.player,{x,y},(a,b)=>{const c=cell(s,a,b);return c?.known&&c.terrain!=='w';});}
 export function stepMinutes(s,x,y,local=!!s.player.local){if(timeFrozen(s))return 0;return (local?(stealth(s)?2:1):(cell(s,x,y).terrain==='h'?12:6)+eventDelay(s,cell(s,x,y)))+injuryDelay(s);}
 export function routeMinutes(s,path){return path?.length?path.reduce((sum,p)=>sum+stepMinutes(s,p.x,p.y),0):0;}
@@ -171,7 +172,8 @@ export function move(s,x,y) {
   for(const step of path){if(s.ended)break;if(p&&occupied(s,localMap(s),step.x,step.y,p)){log(s,'前方出现生物，停止移动。');break;}if(p){if(s.lighting)s.lighting.facing=step.x>p.x?'east':step.x<p.x?'west':step.y>p.y?'south':'north';p.x=step.x;p.y=step.y;tick(s,stepMinutes(s,step.x,step.y));revealLocal(s);}else{s.player.x=step.x;s.player.y=step.y;tick(s,stepMinutes(s,step.x,step.y));reveal(s);}}
   log(s,p?`移动到地点位置 ${p.x},${p.y}。`:`抵达${cell(s).name}（${s.player.x},${s.player.y}）。`);
 }
-export function adjacent(s,x,y) {const p=s.player.local;return p&&Math.abs(p.x-x)+Math.abs(p.y-y)===1;}
+export function interactionDistance(s,x,y){return contactDistance(localMap(s),s.player.local,{x,y});}
+export function adjacent(s,x,y) {const p=s.player.local;return !!p&&(p.x!==x||p.y!==y)&&localTouch(localMap(s),p,{x,y});}
 export function door(s,x,y) {const map=localMap(s),k=key(x,y);assert(map&&Object.hasOwn(map.doors,k)&&adjacent(s,x,y),'请先走到门的相邻位置');assert(!map.doors[k]||!occupied(s,map,x,y),'门口被生物占用，不能关闭');map.doors[k]=!map.doors[k];tick(s,1);revealLocal(s);log(s,map.doors[k]?'打开了门。':'关上了门。');}
 export function leave(s){const map=localMap(s);assert(map&&s.player.local.x===map.exit.x&&s.player.local.y===map.exit.y,'需要先走到区域出入口');tick(s,1);s.player.local=s.player.local.parent??null;refreshSight(s);log(s,s.player.local?'返回周边地块。':'返回区域地图。');}
 export function searchContainer(s,x,y,raw){const c=localMap(s)?.containers[key(x,y)];assert(c&&!c.removed&&!c.resourceId&&adjacent(s,x,y),'请先走到容器的相邻位置');assert(!c.searched,'该容器已经搜索过');const loot=validateLoot(raw);c.searched=true;c.items={};for(const[id,q]of Object.entries(loot.items))gainFood(s,c.items,id,q);c.description=loot.description;tick(s,10);log(s,`搜索${c.name}：${loot.description}`);}

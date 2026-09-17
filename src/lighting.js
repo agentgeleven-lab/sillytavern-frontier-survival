@@ -19,7 +19,7 @@ export function lightingAction(s,action,item){
   if(action==='fireBuild'){
    E.assert(!map.fire,'本地块已有火堆');E.assert(map.grid[p.y][p.x]==='.'&&!map.containers[E.key(p.x,p.y)]&&!map.portals.some(a=>a.x===p.x&&a.y===p.y),'请在没有物件或入口的地面生火');E.assert((s.bag.wood??0)>=2,'需要 2 份木材');s.bag.wood-=2;E.tick(s,10);map.fire={x:p.x,y:p.y,remaining:120,updatedAt:s.time,lit:true};E.log(s,'搭起营火，燃料可持续 120 分钟。');
   }else{
-   const f=map.fire;E.assert(f&&Math.abs(p.x-f.x)+Math.abs(p.y-f.y)<=1,'请走到火堆旁');const remaining=fireRemaining(s,f);
+   const f=map.fire;E.assert(f&&E.interactionDistance(s,f.x,f.y)<=1,'请走到火堆旁');const remaining=fireRemaining(s,f);
    if(action==='fireFeed'){E.assert((s.bag.wood??0)>0&&remaining+60<=LIGHTS.fire.max,'需要木材，且燃料不能超过 480 分钟');s.bag.wood--;f.lit=f.lit&&remaining>0;f.remaining=remaining+60;f.updatedAt=s.time;E.log(s,'添入木材，增加 60 分钟燃料。');}
    else{E.assert(remaining>0,'火堆没有燃料，请先添柴');f.remaining=remaining;f.updatedAt=s.time;f.lit=!(f.lit&&remaining>0);E.log(s,f.lit?'点燃营火。':'熄灭营火，保留剩余木料。');}
   }
