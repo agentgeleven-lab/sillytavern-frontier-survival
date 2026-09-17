@@ -28,6 +28,7 @@ export {phaseAt} from './daylight.js';
 import {validateResources,validateFieldMetadata,RESOURCES} from './field-data.js';
 import {NATURAL_POINTS,validateEnvironment,validateEcology,knownEnvironment} from './environment.js';
 import {readTerrain} from './terrain-input.js';
+import {validateOpenings} from './wall-art.js';
 import { REGION_SIZES, BUILDING_SIZES, rasterizeLayout } from './layout.js';
 // The game state is the authority. Model output is input data, never executable code.
 export const VERSION = 2;
@@ -138,6 +139,7 @@ export function validateLocal(raw, size='normal', saved=false) {
   const start=exits[0];
   for(let y=0;y<h;y++)for(let x=0;x<w;x++)if('.+'.includes(grid[y][x]))for(const [dx,dy]of [[1,0],[-1,0],[0,1],[0,-1]])assert(grid[y+dy]?.[x+dx]&&grid[y+dy][x+dx]!=='_','室内地板不能直接通向建筑外部');assert(start.x===0||start.y===0||start.x===w-1||start.y===h-1,'区域出口必须位于地图边缘');
   assert(Array.isArray(raw.containers)&&raw.containers.length>=(saved?0:1)&&raw.containers.length<=60,'需要 1–60 个可搜索容器');
+  if(!saved)validateOpenings(grid,raw.containers);
   const occupied=new Set(),containers={};
   raw.containers.forEach((c,i)=>{const x=int(c.x,1,w-2),y=int(c.y,1,h-2),k=key(x,y);assert(grid[y][x]==='.'&&!occupied.has(k),'容器必须位于不重叠的地板上');occupied.add(k);containers[k]={id:`container-${i}`,x,y,name:text(c.name,60),kind:text(c.kind,50),searched:false,items:{}};});
   const seen=flood(start,(x,y)=>x>=0&&y>=0&&x<w&&y<h&&'.+E'.includes(grid[y][x])&&!occupied.has(key(x,y)));

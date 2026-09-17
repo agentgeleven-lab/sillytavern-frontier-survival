@@ -27,6 +27,7 @@ import {encyclopediaHTML,encyclopediaResults} from './encyclopedia.js';
 import {RESOURCES,parcelSpec} from './field-data.js';
 import {diagnosedRequest} from './diagnostics.js';
 import {diagnosticsHTML} from './diagnostics-view.js';
+import {preloadAssets,onAssetsChanged} from './assets.js';
 import {paintAtlas,paintMap} from './map-art.js';
 import {environmentLabel,NATURAL_POINTS} from './environment.js';
 import { REGION_SIZES, BUILDING_SIZES, SIZE_NAMES } from './layout.js';
@@ -37,7 +38,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const button=(action,label,disabled=false,extra='')=>`<button type="button" data-action="${action}" ${disabled?'disabled':''} ${extra}>${label}</button>`;
 export function createUI({store,api,actions,diagnostics,hostAvailable}){
   const root=document.createElement('section');root.className='fs-root';root.hidden=true;root.setAttribute('aria-label','边境探索生存');
-  root.innerHTML=`<header class="fs-header"><div class="fs-brand"><span class="fs-mark">F</span><div><b>边境 <span>FRONTIER</span></b><small>探索 / 生存 / 记忆</small></div></div><div class="fs-head-actions"><span class="fs-save-indicator">本地独立存档</span>${button('export','导出存档')}${button('import','导入')}${button('close','收起',false,'aria-label="收起游戏面板"')}</div></header><div class="fs-shell"><nav class="fs-nav" aria-label="游戏导航">${[['map','01','探索地图'],['bag','02','随身背包'],['camp','03','我的庇护所'],['journal','04','线索与日志'],['settings','05','游戏设置'],['diagnostics','06','诊断与调试'],['guide','07','生存百科']].map(([id,n,label])=>`<button type="button" data-tab="${id}"><small>${n}</small>${label}</button>`).join('')}<div class="fs-nav-bottom"><span class="fs-mode"></span><small>v0.25.0 · 预览版</small></div></nav><main class="fs-main"><div class="fs-heading"></div><div class="fs-statusbar"></div><div class="fs-conditionbar"></div><div class="fs-content"></div><footer class="fs-feedback" role="status" aria-live="polite"></footer></main></div>`;
+  root.innerHTML=`<header class="fs-header"><div class="fs-brand"><span class="fs-mark">F</span><div><b>边境 <span>FRONTIER</span></b><small>探索 / 生存 / 记忆</small></div></div><div class="fs-head-actions"><span class="fs-save-indicator">本地独立存档</span>${button('export','导出存档')}${button('import','导入')}${button('close','收起',false,'aria-label="收起游戏面板"')}</div></header><div class="fs-shell"><nav class="fs-nav" aria-label="游戏导航">${[['map','01','探索地图'],['bag','02','随身背包'],['camp','03','我的庇护所'],['journal','04','线索与日志'],['settings','05','游戏设置'],['diagnostics','06','诊断与调试'],['guide','07','生存百科']].map(([id,n,label])=>`<button type="button" data-tab="${id}"><small>${n}</small>${label}</button>`).join('')}<div class="fs-nav-bottom"><span class="fs-mode"></span><small>v0.26.0 · 预览版</small></div></nav><main class="fs-main"><div class="fs-heading"></div><div class="fs-statusbar"></div><div class="fs-conditionbar"></div><div class="fs-content"></div><footer class="fs-feedback" role="status" aria-live="polite"></footer></main></div>`;
   document.body.append(root);
   const launcher=document.createElement('button');launcher.className='fs-launcher';launcher.textContent='边境 · 探索';launcher.title='打开独立探索生存游戏';document.body.append(launcher);
   let guideCategory='全部',guideQuery='';
@@ -233,7 +234,8 @@ export function createUI({store,api,actions,diagnostics,hostAvailable}){
   });
   const ro=new ResizeObserver(()=>draw());ro.observe(content);
   const unsubscribe=store.subscribe(render);
+  let assetFrame=0;const stopAssets=onAssetsChanged(()=>{cancelAnimationFrame(assetFrame);assetFrame=requestAnimationFrame(()=>{if(root.hidden)return;if(tab==='map')draw();else if(tab==='camp'&&store.state&&!campDrag&&!campPaint)renderCamp(store.state);});});preloadAssets();
   const stopDiagnostics=diagnostics?.subscribe(()=>{if(!root.hidden&&tab==='diagnostics')renderDiagnostics();});
   const open=()=>{root.hidden=false;render();};launcher.onclick=open;
-  return {open,render,setStatus,close(){root.hidden=true;},destroy(){stopDiagnostics?.();cancelModels();ro.disconnect();unsubscribe();root.remove();launcher.remove();}};
+  return {open,render,setStatus,close(){root.hidden=true;},destroy(){stopAssets();cancelAnimationFrame(assetFrame);stopDiagnostics?.();cancelModels();ro.disconnect();unsubscribe();root.remove();launcher.remove();}};
 }
